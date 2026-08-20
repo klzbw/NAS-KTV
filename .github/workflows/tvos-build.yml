@@ -92,6 +92,15 @@ jobs:
         if: ${{ github.event.inputs.sign != 'true' && !startsWith(github.ref, 'refs/tags/v') }}
         run: |
           cd ${{ env.PROJECT_PATH }}
+          
+          # 预先创建.app目录并复制Info.plist（解决验证阶段找不到Info.plist的问题）
+          APP_PATH="build/Build/Products/${{ env.CONFIGURATION }}-appletvsimulator/NASKTV.app"
+          mkdir -p "$APP_PATH"
+          if [ -f "NASKTV/Info.plist" ]; then
+            cp NASKTV/Info.plist "$APP_PATH/Info.plist"
+            echo "Info.plist pre-copied to $APP_PATH"
+          fi
+          
           echo "=== Starting build ==="
           xcodebuild \
             -project NASKTV.xcodeproj \
@@ -103,19 +112,31 @@ jobs:
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
-            VALIDATE_PRODUCT=NO \
             build 2>&1 | tee build.log
           BUILD_EXIT=${PIPESTATUS[0]}
           echo ""
           echo "=== Build exit code: $BUILD_EXIT ==="
           
-          # 手动复制Info.plist到.app包
-          APP_PATH="build/Build/Products/${{ env.CONFIGURATION }}-appletvsimulator/NASKTV.app"
-          if [ -d "$APP_PATH" ] && [ -f "NASKTV/Info.plist" ]; then
-            echo "=== Copying Info.plist to .app ==="
-            cp NASKTV/Info.plist "$APP_PATH/Info.plist"
-            echo "Info.plist copied successfully"
-            ls -la "$APP_PATH/Info.plist"
+          # 如果第一次构建失败（验证问题），复制Info.plist后重试一次
+          if [ $BUILD_EXIT -ne 0 ]; then
+            echo "=== First build failed, retrying with Info.plist ==="
+            if [ -d "$APP_PATH" ] && [ -f "NASKTV/Info.plist" ]; then
+              cp NASKTV/Info.plist "$APP_PATH/Info.plist"
+              echo "Info.plist copied, retrying build..."
+              xcodebuild \
+                -project NASKTV.xcodeproj \
+                -scheme NASKTV \
+                -configuration "${{ env.CONFIGURATION }}" \
+                -sdk appletvsimulator \
+                -destination 'generic/platform=tvOS Simulator' \
+                -derivedDataPath build \
+                CODE_SIGN_IDENTITY="" \
+                CODE_SIGNING_REQUIRED=NO \
+                CODE_SIGNING_ALLOWED=NO \
+                build 2>&1 | tee build2.log
+              BUILD_EXIT=${PIPESTATUS[0]}
+              echo "=== Retry build exit code: $BUILD_EXIT ==="
+            fi
           fi
           
           if [ $BUILD_EXIT -ne 0 ]; then
