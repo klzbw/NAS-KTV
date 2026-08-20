@@ -187,7 +187,7 @@
 				en,
 				Base,
 			);
-			mainGroup = B9000000000000000000001;
+			mainGroup = B4000000000000000000001;
 			productRefGroup = B4000000000000000000003 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
