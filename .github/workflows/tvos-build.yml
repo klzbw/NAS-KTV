@@ -1,0 +1,168 @@
+name: tvOS Build
+
+on:
+  push:
+    tags:
+      - 'v*'
+    paths:
+      - 'packages/tvos-app/**'
+      - '.github/workflows/tvos-build.yml'
+  workflow_dispatch:
+    inputs:
+      configuration:
+        description: 'Build configuration'
+        required: true
+        default: 'Release'
+        type: choice
+        options:
+          - Debug
+          - Release
+      sign:
+        description: 'Sign app (requires certificates)'
+        required: true
+        default: false
+        type: boolean
+
+env:
+  DEVELOPER_DIR: /Applications/Xcode_15.4.app/Contents/Developer
+  PROJECT_PATH: packages/tvos-app/NASKTV.xcodeproj
+  SCHEME: NASKTV
+  CONFIGURATION: ${{ github.event.inputs.configuration || 'Release' }}
+
+jobs:
+  build:
+    name: Build tvOS App
+    runs-on: macos-14
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: |
+          sudo xcode-select -switch "${{ env.DEVELOPER_DIR }}"
+          xcodebuild -version
+          xcodebuild -showsdks | grep appletvos
+
+      - name: Show project info
+        run: |
+          cd packages/tvos-app
+          xcodebuild -list -project NASKTV.xcodeproj
+
+      - name: Install Apple Certificate (if signed)
+        if: ${{ github.event.inputs.sign == 'true' || startsWith(github.ref, 'refs/tags/v') }}
+        uses: apple-actions/import-codesign-certs@v3
+        with:
+          p12-file-base64: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE }}
+          p12-password: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_PASSWORD }}
+          keychain: ${{ github.runner }}.keychain
+
+      - name: Install Provisioning Profile (if signed)
+        if: ${{ github.event.inputs.sign == 'true' || startsWith(github.ref, 'refs/tags/v') }}
+        run: |
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          echo "${{ secrets.TVOS_PROVISIONING_PROFILE }}" | base64 -d > ~/Library/MobileDevice/Provisioning\ Profiles/NASKTV_tvOS.mobileprovision
+
+      - name: Build (Unsigned - Simulator)
+        if: ${{ github.event.inputs.sign != 'true' && !startsWith(github.ref, 'refs/tags/v') }}
+        run: |
+          cd packages/tvos-app
+          xcodebuild \
+            -project NASKTV.xcodeproj \
+            -scheme NASKTV \
+            -configuration "${{ env.CONFIGURATION }}" \
+            -sdk appletvsimulator \
+            -destination 'generic/platform=tvOS Simulator' \
+            -derivedDataPath build \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: Archive (Signed - Release)
+        if: ${{ github.event.inputs.sign == 'true' || startsWith(github.ref, 'refs/tags/v') }}
+        run: |
+          cd packages/tvos-app
+          xcodebuild \
+            -project NASKTV.xcodeproj \
+            -scheme NASKTV \
+            -configuration Release \
+            -sdk appletvos \
+            -destination 'generic/platform=tvOS' \
+            -archivePath build/NASKTV.xcarchive \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            PROVISIONING_PROFILE_SPECIFIER="NASKTV tvOS" \
+            archive
+
+      - name: Export IPA (Signed)
+        if: ${{ github.event.inputs.sign == 'true' || startsWith(github.ref, 'refs/tags/v') }}
+        run: |
+          cd packages/tvos-app
+          cat > ExportOptions.plist << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>method</key>
+              <string>app-store</string>
+              <key>destination</key>
+              <string>export</string>
+              <key>signingStyle</key>
+              <string>manual</string>
+              <key>stripSwiftSymbols</key>
+              <true/>
+              <key>teamID</key>
+              <string>${{ secrets.APPLE_TEAM_ID }}</string>
+              <key>provisioningProfiles</key>
+              <dict>
+                  <key>com.nasktv.app</key>
+                  <string>NASKTV tvOS</string>
+              </dict>
+          </dict>
+          </plist>
+          EOF
+
+          xcodebuild \
+            -exportArchive \
+            -archivePath build/NASKTV.xcarchive \
+            -exportPath build/export \
+            -exportOptionsPlist ExportOptions.plist
+
+      - name: Package Simulator Build
+        if: ${{ github.event.inputs.sign != 'true' && !startsWith(github.ref, 'refs/tags/v') }}
+        run: |
+          cd packages/tvos-app
+          APP_PATH=$(find build/Build/Products -name "NASKTV.app" -type d | head -1)
+          echo "App path: $APP_PATH"
+          if [ -n "$APP_PATH" ]; then
+            mkdir -p build/output
+            cp -R "$APP_PATH" build/output/
+            cd build/output
+            zip -r ../NASKTV-tvOS-Simulator.zip NASKTV.app
+            echo "Simulator build packaged"
+          fi
+
+      - name: Upload Build Artifact (Simulator)
+        if: ${{ github.event.inputs.sign != 'true' && !startsWith(github.ref, 'refs/tags/v') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: NASKTV-tvOS-Simulator
+          path: packages/tvos-app/build/NASKTV-tvOS-Simulator.zip
+          retention-days: 30
+
+      - name: Upload Build Artifact (IPA)
+        if: ${{ github.event.inputs.sign == 'true' || startsWith(github.ref, 'refs/tags/v') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: NASKTV-tvOS
+          path: packages/tvos-app/build/export/*.ipa
+          retention-days: 90
+
+      - name: Upload to Release (Tag)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            packages/tvos-app/build/export/*.ipa
+          fail_on_unmatched_files: false
