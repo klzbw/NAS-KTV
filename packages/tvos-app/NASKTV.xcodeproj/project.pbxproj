@@ -7,67 +7,57 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		A1000001000000000000A01 /* NASKTVApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000001000000000000A01 /* NASKTVApp.swift */; };
-		A1000002000000000000A02 /* ServerConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000002000000000000A02 /* ServerConfig.swift */; };
-		A1000003000000000000A03 /* Song.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000003000000000000A03 /* Song.swift */; };
-		A1000004000000000000A04 /* Artist.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000004000000000000A04 /* Artist.swift */; };
-		A1000005000000000000A05 /* Category.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000005000000000000A05 /* Category.swift */; };
-		A1000006000000000000A06 /* QueueItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000006000000000000A06 /* QueueItem.swift */; };
-		A1000007000000000000A07 /* APIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000007000000000000A07 /* APIService.swift */; };
-		A1000008000000000000A08 /* WebSocketService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000008000000000000A08 /* WebSocketService.swift */; };
-		A1000009000000000000A09 /* PlayerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000009000000000000A09 /* PlayerService.swift */; };
-		A100000A000000000000A0A /* ServerViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000A000000000000A0A /* ServerViewModel.swift */; };
-		A100000B000000000000A0B /* LibraryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000B000000000000A0B /* LibraryViewModel.swift */; };
-		A100000C000000000000A0C /* PlayerViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000C000000000000A0C /* PlayerViewModel.swift */; };
-		A100000D000000000000A0D /* SearchViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000D000000000000A0D /* SearchViewModel.swift */; };
-		A100000E000000000000A0E /* ServerSetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000E000000000000A0E /* ServerSetupView.swift */; };
-		A100000F000000000000A0F /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000F000000000000A0F /* HomeView.swift */; };
-		A1000010000000000000A10 /* PlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000010000000000000A10 /* PlayerView.swift */; };
-		A1000011000000000000A11 /* SearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000011000000000000A11 /* SearchView.swift */; };
-		A1000012000000000000A12 /* QueueView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000012000000000000A12 /* QueueView.swift */; };
-		A1000013000000000000A13 /* MiniPlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000013000000000000A13 /* MiniPlayerView.swift */; };
-		A1000014000000000000A14 /* SongListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000014000000000000A14 /* SongListView.swift */; };
-		A1000015000000000000A15 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A2000015000000000000A15 /* Assets.xcassets */; };
-		A1000016000000000000A16 /* NASKTVTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000016000000000000A16 /* NASKTVTests.swift */; };
+		B1000000000000000000001 /* NASKTVApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000000000000000000001 /* NASKTVApp.swift */; };
+		B1000000000000000000002 /* ServerConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000000000000000000002 /* ServerConfig.swift */; };
+		B1000000000000000000003 /* Song.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000000000000000000003 /* Song.swift */; };
+		B1000000000000000000004 /* Artist.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000000000000000000004 /* Artist.swift */; };
+		B1000000000000000000005 /* Category.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000000000000000000005 /* Category.swift */; };
+		B1000000000000000000006 /* QueueItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000000000000000000006 /* QueueItem.swift */; };
+		B1000000000000000000007 /* APIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000000000000000000007 /* APIService.swift */; };
+		B1000000000000000000008 /* WebSocketService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000000000000000000008 /* WebSocketService.swift */; };
+		B1000000000000000000009 /* PlayerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000000000000000000009 /* PlayerService.swift */; };
+		B100000000000000000000A /* ServerViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B200000000000000000000A /* ServerViewModel.swift */; };
+		B100000000000000000000B /* LibraryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B200000000000000000000B /* LibraryViewModel.swift */; };
+		B100000000000000000000C /* PlayerViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B200000000000000000000C /* PlayerViewModel.swift */; };
+		B100000000000000000000D /* SearchViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B200000000000000000000D /* SearchViewModel.swift */; };
+		B100000000000000000000E /* ServerSetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B200000000000000000000E /* ServerSetupView.swift */; };
+		B100000000000000000000F /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B200000000000000000000F /* HomeView.swift */; };
+		B1000000000000000000010 /* PlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000000000000000000010 /* PlayerView.swift */; };
+		B1000000000000000000011 /* SearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000000000000000000011 /* SearchView.swift */; };
+		B1000000000000000000012 /* QueueView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000000000000000000012 /* QueueView.swift */; };
+		B1000000000000000000013 /* MiniPlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000000000000000000013 /* MiniPlayerView.swift */; };
+		B1000000000000000000014 /* SongListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000000000000000000014 /* SongListView.swift */; };
+		B1000000000000000000015 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B2000000000000000000015 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		A2000001000000000000A01 /* NASKTVApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NASKTVApp.swift; sourceTree = "<group>"; };
-		A2000002000000000000A02 /* ServerConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerConfig.swift; sourceTree = "<group>"; };
-		A2000003000000000000A03 /* Song.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Song.swift; sourceTree = "<group>"; };
-		A2000004000000000000A04 /* Artist.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Artist.swift; sourceTree = "<group>"; };
-		A2000005000000000000A05 /* Category.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Category.swift; sourceTree = "<group>"; };
-		A2000006000000000000A06 /* QueueItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueueItem.swift; sourceTree = "<group>"; };
-		A2000007000000000000A07 /* APIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIService.swift; sourceTree = "<group>"; };
-		A2000008000000000000A08 /* WebSocketService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebSocketService.swift; sourceTree = "<group>"; };
-		A2000009000000000000A09 /* PlayerService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerService.swift; sourceTree = "<group>"; };
-		A200000A000000000000A0A /* ServerViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerViewModel.swift; sourceTree = "<group>"; };
-		A200000B000000000000A0B /* LibraryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryViewModel.swift; sourceTree = "<group>"; };
-		A200000C000000000000A0C /* PlayerViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerViewModel.swift; sourceTree = "<group>"; };
-		A200000D000000000000A0D /* SearchViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchViewModel.swift; sourceTree = "<group>"; };
-		A200000E000000000000A0E /* ServerSetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerSetupView.swift; sourceTree = "<group>"; };
-		A200000F000000000000A0F /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
-		A2000010000000000000A10 /* PlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerView.swift; sourceTree = "<group>"; };
-		A2000011000000000000A11 /* SearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchView.swift; sourceTree = "<group>"; };
-		A2000012000000000000A12 /* QueueView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueueView.swift; sourceTree = "<group>"; };
-		A2000013000000000000A13 /* MiniPlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MiniPlayerView.swift; sourceTree = "<group>"; };
-		A2000014000000000000A14 /* SongListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SongListView.swift; sourceTree = "<group>"; };
-		A2000015000000000000A15 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		A2000016000000000000A16 /* NASKTVTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NASKTVTests.swift; sourceTree = "<group>"; };
-		A2000017000000000000A17 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		A2000018000000000000A18 /* NASKTV.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = NASKTV.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		A2000019000000000000A19 /* NASKTVTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = NASKTVTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		B2000000000000000000001 /* NASKTVApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NASKTVApp.swift; sourceTree = "<group>"; };
+		B2000000000000000000002 /* ServerConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerConfig.swift; sourceTree = "<group>"; };
+		B2000000000000000000003 /* Song.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Song.swift; sourceTree = "<group>"; };
+		B2000000000000000000004 /* Artist.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Artist.swift; sourceTree = "<group>"; };
+		B2000000000000000000005 /* Category.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Category.swift; sourceTree = "<group>"; };
+		B2000000000000000000006 /* QueueItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueueItem.swift; sourceTree = "<group>"; };
+		B2000000000000000000007 /* APIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIService.swift; sourceTree = "<group>"; };
+		B2000000000000000000008 /* WebSocketService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebSocketService.swift; sourceTree = "<group>"; };
+		B2000000000000000000009 /* PlayerService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerService.swift; sourceTree = "<group>"; };
+		B200000000000000000000A /* ServerViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerViewModel.swift; sourceTree = "<group>"; };
+		B200000000000000000000B /* LibraryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryViewModel.swift; sourceTree = "<group>"; };
+		B200000000000000000000C /* PlayerViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerViewModel.swift; sourceTree = "<group>"; };
+		B200000000000000000000D /* SearchViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchViewModel.swift; sourceTree = "<group>"; };
+		B200000000000000000000E /* ServerSetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerSetupView.swift; sourceTree = "<group>"; };
+		B200000000000000000000F /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+		B2000000000000000000010 /* PlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerView.swift; sourceTree = "<group>"; };
+		B2000000000000000000011 /* SearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchView.swift; sourceTree = "<group>"; };
+		B2000000000000000000012 /* QueueView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueueView.swift; sourceTree = "<group>"; };
+		B2000000000000000000013 /* MiniPlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MiniPlayerView.swift; sourceTree = "<group>"; };
+		B2000000000000000000014 /* SongListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SongListView.swift; sourceTree = "<group>"; };
+		B2000000000000000000015 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		B2000000000000000000016 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		B2000000000000000000017 /* NASKTV.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = NASKTV.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		A3000001000000000000A01 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		A3000002000000000000A02 /* Frameworks */ = {
+		B3000000000000000000001 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -77,89 +67,79 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		A4000001000000000000A01 = {
+		B4000000000000000000001 = {
 			isa = PBXGroup;
 			children = (
-				A4000002000000000000A02 /* NASKTV */,
-				A4000003000000000000A03 /* NASKTVTests */,
-				A4000004000000000000A04 /* Products */,
+				B4000000000000000000002 /* NASKTV */,
+				B4000000000000000000003 /* Products */,
 			);
 			sourceTree = "<group>";
 		};
-		A4000002000000000000A02 /* NASKTV */ = {
+		B4000000000000000000002 /* NASKTV */ = {
 			isa = PBXGroup;
 			children = (
-				A2000001000000000000A01 /* NASKTVApp.swift */,
-				A4000005000000000000A05 /* Models */,
-				A4000006000000000000A06 /* Services */,
-				A4000007000000000000A07 /* ViewModels */,
-				A4000008000000000000A08 /* Views */,
-				A2000015000000000000A15 /* Assets.xcassets */,
-				A2000017000000000000A17 /* Info.plist */,
+				B2000000000000000000001 /* NASKTVApp.swift */,
+				B4000000000000000000004 /* Models */,
+				B4000000000000000000005 /* Services */,
+				B4000000000000000000006 /* ViewModels */,
+				B4000000000000000000007 /* Views */,
+				B2000000000000000000015 /* Assets.xcassets */,
+				B2000000000000000000016 /* Info.plist */,
 			);
 			path = NASKTV;
 			sourceTree = "<group>";
 		};
-		A4000003000000000000A03 /* NASKTVTests */ = {
+		B4000000000000000000003 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				A2000016000000000000A16 /* NASKTVTests.swift */,
-			);
-			path = NASKTVTests;
-			sourceTree = "<group>";
-		};
-		A4000004000000000000A04 /* Products */ = {
-			isa = PBXGroup;
-			children = (
-				A2000018000000000000A18 /* NASKTV.app */,
-				A2000019000000000000A19 /* NASKTVTests.xctest */,
+				B2000000000000000000017 /* NASKTV.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
 		};
-		A4000005000000000000A05 /* Models */ = {
+		B4000000000000000000004 /* Models */ = {
 			isa = PBXGroup;
 			children = (
-				A2000002000000000000A02 /* ServerConfig.swift */,
-				A2000003000000000000A03 /* Song.swift */,
-				A2000004000000000000A04 /* Artist.swift */,
-				A2000005000000000000A05 /* Category.swift */,
-				A2000006000000000000A06 /* QueueItem.swift */,
+				B2000000000000000000002 /* ServerConfig.swift */,
+				B2000000000000000000003 /* Song.swift */,
+				B2000000000000000000004 /* Artist.swift */,
+				B2000000000000000000005 /* Category.swift */,
+				B2000000000000000000006 /* QueueItem.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
 		};
-		A4000006000000000000A06 /* Services */ = {
+		B4000000000000000000005 /* Services */ = {
 			isa = PBXGroup;
 			children = (
-				A2000007000000000000A07 /* APIService.swift */,
-				A2000008000000000000A08 /* WebSocketService.swift */,
-				A2000009000000000000A09 /* PlayerService.swift */,
+				B2000000000000000000007 /* APIService.swift */,
+				B2000000000000000000008 /* WebSocketService.swift */,
+				B2000000000000000000009 /* PlayerService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
 		};
-		A4000007000000000000A07 /* ViewModels */ = {
+		B4000000000000000000006 /* ViewModels */ = {
 			isa = PBXGroup;
 			children = (
-				A200000A000000000000A0A /* ServerViewModel.swift */,
-				A200000B000000000000A0B /* LibraryViewModel.swift */,
-				A200000C000000000000A0C /* PlayerViewModel.swift */,
-				A200000D000000000000A0D /* SearchViewModel.swift */,
+				B200000000000000000000A /* ServerViewModel.swift */,
+				B200000000000000000000B /* LibraryViewModel.swift */,
+				B200000000000000000000C /* PlayerViewModel.swift */,
+				B200000000000000000000D /* SearchViewModel.swift */,
 			);
 			path = ViewModels;
 			sourceTree = "<group>";
 		};
-		A4000008000000000000A08 /* Views */ = {
+		B4000000000000000000007 /* Views */ = {
 			isa = PBXGroup;
 			children = (
-				A200000E000000000000A0E /* ServerSetupView.swift */,
-				A200000F000000000000A0F /* HomeView.swift */,
-				A2000010000000000000A10 /* PlayerView.swift */,
-				A2000011000000000000A11 /* SearchView.swift */,
-				A2000012000000000000A12 /* QueueView.swift */,
-				A2000013000000000000A13 /* MiniPlayerView.swift */,
-				A2000014000000000000A14 /* SongListView.swift */,
+				B200000000000000000000E /* ServerSetupView.swift */,
+				B200000000000000000000F /* HomeView.swift */,
+				B2000000000000000000010 /* PlayerView.swift */,
+				B2000000000000000000011 /* SearchView.swift */,
+				B2000000000000000000012 /* QueueView.swift */,
+				B2000000000000000000013 /* MiniPlayerView.swift */,
+				B2000000000000000000014 /* SongListView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -167,13 +147,13 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		A5000001000000000000A01 /* NASKTV */ = {
+		B5000000000000000000001 /* NASKTV */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = A6000001000000000000A01 /* Build configuration list for PBXNativeTarget "NASKTV" */;
+			buildConfigurationList = B6000000000000000000001 /* Build configuration list for PBXNativeTarget "NASKTV" */;
 			buildPhases = (
-				A7000001000000000000A01 /* Sources */,
-				A3000001000000000000A01 /* Frameworks */,
-				A8000001000000000000A01 /* Resources */,
+				B7000000000000000000001 /* Sources */,
+				B3000000000000000000001 /* Frameworks */,
+				B8000000000000000000001 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -181,46 +161,25 @@
 			);
 			name = NASKTV;
 			productName = NASKTV;
-			productReference = A2000018000000000000A18 /* NASKTV.app */;
+			productReference = B2000000000000000000017 /* NASKTV.app */;
 			productType = "com.apple.product-type.application";
-		};
-		A5000002000000000000A02 /* NASKTVTests */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = A6000002000000000000A02 /* Build configuration list for PBXNativeTarget "NASKTVTests" */;
-			buildPhases = (
-				A7000002000000000000A02 /* Sources */,
-				A3000002000000000000A02 /* Frameworks */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-				A9000001000000000000A01 /* PBXTargetDependency */,
-			);
-			name = NASKTVTests;
-			productName = NASKTVTests;
-			productReference = A2000019000000000000A19 /* NASKTVTests.xctest */;
-			productType = "com.apple.product-type.bundle.unit-test";
 		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
-		AA000001000000000000A01 /* Project object */ = {
+		B9000000000000000000001 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 1500;
 				LastUpgradeCheck = 1500;
 				TargetAttributes = {
-					A5000001000000000000A01 = {
+					B5000000000000000000001 = {
 						CreatedOnToolsVersion = 15.0;
-					};
-					A5000002000000000000A02 = {
-						CreatedOnToolsVersion = 15.0;
-						TestTargetID = A5000001000000000000A01;
 					};
 				};
 			};
-			buildConfigurationList = AB000001000000000000A01 /* Build configuration list for PBXProject "NASKTV" */;
+			buildConfigurationList = BA000000000000000000001 /* Build configuration list for PBXProject "NASKTV" */;
 			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
@@ -228,86 +187,59 @@
 				en,
 				Base,
 			);
-			mainGroup = AA000001000000000000A01;
-			productRefGroup = A4000004000000000000A04 /* Products */;
+			mainGroup = B9000000000000000000001;
+			productRefGroup = B4000000000000000000003 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				A5000001000000000000A01 /* NASKTV */,
-				A5000002000000000000A02 /* NASKTVTests */,
+				B5000000000000000000001 /* NASKTV */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		A8000001000000000000A01 /* Resources */ = {
+		B8000000000000000000001 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A1000015000000000000A15 /* Assets.xcassets in Resources */,
+				B1000000000000000000015 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		A7000001000000000000A01 /* Sources */ = {
+		B7000000000000000000001 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A1000001000000000000A01 /* NASKTVApp.swift in Sources */,
-				A1000002000000000000A02 /* ServerConfig.swift in Sources */,
-				A1000003000000000000A03 /* Song.swift in Sources */,
-				A1000004000000000000A04 /* Artist.swift in Sources */,
-				A1000005000000000000A05 /* Category.swift in Sources */,
-				A1000006000000000000A06 /* QueueItem.swift in Sources */,
-				A1000007000000000000A07 /* APIService.swift in Sources */,
-				A1000008000000000000A08 /* WebSocketService.swift in Sources */,
-				A1000009000000000000A09 /* PlayerService.swift in Sources */,
-				A100000A000000000000A0A /* ServerViewModel.swift in Sources */,
-				A100000B000000000000A0B /* LibraryViewModel.swift in Sources */,
-				A100000C000000000000A0C /* PlayerViewModel.swift in Sources */,
-				A100000D000000000000A0D /* SearchViewModel.swift in Sources */,
-				A100000E000000000000A0E /* ServerSetupView.swift in Sources */,
-				A100000F000000000000A0F /* HomeView.swift in Sources */,
-				A1000010000000000000A10 /* PlayerView.swift in Sources */,
-				A1000011000000000000A11 /* SearchView.swift in Sources */,
-				A1000012000000000000A12 /* QueueView.swift in Sources */,
-				A1000013000000000000A13 /* MiniPlayerView.swift in Sources */,
-				A1000014000000000000A14 /* SongListView.swift in Sources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		A7000002000000000000A02 /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				A1000016000000000000A16 /* NASKTVTests.swift in Sources */,
+				B1000000000000000000001 /* NASKTVApp.swift in Sources */,
+				B1000000000000000000002 /* ServerConfig.swift in Sources */,
+				B1000000000000000000003 /* Song.swift in Sources */,
+				B1000000000000000000004 /* Artist.swift in Sources */,
+				B1000000000000000000005 /* Category.swift in Sources */,
+				B1000000000000000000006 /* QueueItem.swift in Sources */,
+				B1000000000000000000007 /* APIService.swift in Sources */,
+				B1000000000000000000008 /* WebSocketService.swift in Sources */,
+				B1000000000000000000009 /* PlayerService.swift in Sources */,
+				B100000000000000000000A /* ServerViewModel.swift in Sources */,
+				B100000000000000000000B /* LibraryViewModel.swift in Sources */,
+				B100000000000000000000C /* PlayerViewModel.swift in Sources */,
+				B100000000000000000000D /* SearchViewModel.swift in Sources */,
+				B100000000000000000000E /* ServerSetupView.swift in Sources */,
+				B100000000000000000000F /* HomeView.swift in Sources */,
+				B1000000000000000000010 /* PlayerView.swift in Sources */,
+				B1000000000000000000011 /* SearchView.swift in Sources */,
+				B1000000000000000000012 /* QueueView.swift in Sources */,
+				B1000000000000000000013 /* MiniPlayerView.swift in Sources */,
+				B1000000000000000000014 /* SongListView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
-/* Begin PBXTargetDependency section */
-		A9000001000000000000A01 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = A5000001000000000000A01 /* NASKTV */;
-			targetProxy = AC000001000000000000A01 /* PBXContainerItemProxy */;
-		};
-/* End PBXTargetDependency section */
-
-/* Begin PBXContainerItemProxy section */
-		AC000001000000000000A01 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = AA000001000000000000A01 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = A5000001000000000000A01;
-			remoteInfo = NASKTV;
-		};
-/* End PBXContainerItemProxy section */
-
 /* Begin XCBuildConfiguration section */
-		AD000001000000000000A01 /* Debug */ = {
+		BB000000000000000000001 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -358,17 +290,17 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = appletvos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				TVOS_DEPLOYMENT_TARGET = 17.0;
 			};
 			name = Debug;
 		};
-		AD000002000000000000A02 /* Release */ = {
+		BB000000000000000000002 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -413,16 +345,16 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = appletvos;
 				SWIFT_COMPILATION_MODE = wholemodule;
+				TVOS_DEPLOYMENT_TARGET = 17.0;
 				VALIDATE_PRODUCT = YES;
 			};
 			name = Release;
 		};
-		AD000003000000000000A03 /* Debug */ = {
+		BB000000000000000000003 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -436,7 +368,6 @@
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -450,7 +381,7 @@
 			};
 			name = Debug;
 		};
-		AD000004000000000000A04 /* Release */ = {
+		BB000000000000000000004 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -464,7 +395,6 @@
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -475,84 +405,31 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 3;
-			};
-			name = Release;
-		};
-		AD000005000000000000A05 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				BUNDLE_LOADER = "$(TEST_HOST)";
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				GENERATE_INFOPLIST_FILE = YES;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-					"@loader_path/Frameworks",
-				);
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.nasktv.app.tests;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = 3;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/NASKTV.app/NASKTV";
-			};
-			name = Debug;
-		};
-		AD000006000000000000A06 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				BUNDLE_LOADER = "$(TEST_HOST)";
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				GENERATE_INFOPLIST_FILE = YES;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-					"@loader_path/Frameworks",
-				);
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.nasktv.app.tests;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = 3;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/NASKTV.app/NASKTV";
 			};
 			name = Release;
 		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		AB000001000000000000A01 /* Build configuration list for PBXProject "NASKTV" */ = {
+		BA000000000000000000001 /* Build configuration list for PBXProject "NASKTV" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				AD000001000000000000A01 /* Debug */,
-				AD000002000000000000A02 /* Release */,
+				BB000000000000000000001 /* Debug */,
+				BB000000000000000000002 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		A6000001000000000000A01 /* Build configuration list for PBXNativeTarget "NASKTV" */ = {
+		B6000000000000000000001 /* Build configuration list for PBXNativeTarget "NASKTV" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				AD000003000000000000A03 /* Debug */,
-				AD000004000000000000A04 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
-		A6000002000000000000A02 /* Build configuration list for PBXNativeTarget "NASKTVTests" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				AD000005000000000000A05 /* Debug */,
-				AD000006000000000000A06 /* Release */,
+				BB000000000000000000003 /* Debug */,
+				BB0000000000000000000004 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};
-	rootObject = AA000001000000000000A01 /* Project object */;
+	rootObject = B9000000000000000000001 /* Project object */;
 }
