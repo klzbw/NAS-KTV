@@ -103,10 +103,21 @@ jobs:
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
+            VALIDATE_PRODUCT=NO \
             build 2>&1 | tee build.log
           BUILD_EXIT=${PIPESTATUS[0]}
           echo ""
           echo "=== Build exit code: $BUILD_EXIT ==="
+          
+          # 手动复制Info.plist到.app包
+          APP_PATH="build/Build/Products/${{ env.CONFIGURATION }}-appletvsimulator/NASKTV.app"
+          if [ -d "$APP_PATH" ] && [ -f "NASKTV/Info.plist" ]; then
+            echo "=== Copying Info.plist to .app ==="
+            cp NASKTV/Info.plist "$APP_PATH/Info.plist"
+            echo "Info.plist copied successfully"
+            ls -la "$APP_PATH/Info.plist"
+          fi
+          
           if [ $BUILD_EXIT -ne 0 ]; then
             echo "=== Build failed, showing last 100 lines ==="
             tail -100 build.log
