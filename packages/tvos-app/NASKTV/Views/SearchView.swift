@@ -17,7 +17,6 @@ struct SearchView: View {
                 ScrollView {
                     if viewModel.isSearching {
                         ProgressView("搜索中...")
-                            .controlSize(.large)
                             .padding(.top, 80)
                     } else if viewModel.hasSearched && viewModel.results.isEmpty {
                         ContentUnavailableView(

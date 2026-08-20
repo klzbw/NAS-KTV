@@ -108,12 +108,11 @@ struct PlayerView: View {
             ScrollView(showsIndicators: false) {
                 LazyVStack(spacing: 24) {
                     ForEach(Array(viewModel.lyrics.enumerated()), id: \.element.id) { index, line in
-                        Text(line.text)
-                            .font(index == viewModel.currentLyricIndex ? .title : .title3)
-                            .fontWeight(index == viewModel.currentLyricIndex ? .bold : .regular)
-                            .foregroundStyle(index == viewModel.currentLyricColor ? .white : .white.opacity(0.4))
-                            .id(index)
-                            .animation(.easeInOut, value: viewModel.currentLyricIndex)
+                        LyricLineView(
+                            text: line.text,
+                            isCurrent: index == viewModel.currentLyricIndex
+                        )
+                        .id(index)
                     }
                 }
                 .padding(.vertical, 200)
@@ -123,11 +122,11 @@ struct PlayerView: View {
                     proxy.scrollTo(index, anchor: .center)
                 }
             }
-            .onReceive(Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()) { _ in
-                viewModel.updateCurrentLyric()
-            }
         }
         .frame(maxHeight: 400)
+        .onReceive(Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()) { _ in
+            viewModel.updateCurrentLyric()
+        }
     }
 
     // MARK: - 歌曲信息
@@ -206,5 +205,19 @@ struct PlayerView: View {
         let minutes = Int(time) / 60
         let seconds = Int(time) % 60
         return String(format: "%d:%02d", minutes, seconds)
+    }
+}
+
+// MARK: - 歌词行视图
+struct LyricLineView: View {
+    let text: String
+    let isCurrent: Bool
+
+    var body: some View {
+        Text(text)
+            .font(isCurrent ? .title : .title3)
+            .fontWeight(isCurrent ? .bold : .regular)
+            .foregroundStyle(isCurrent ? .white : .white.opacity(0.4))
+            .animation(.easeInOut, value: isCurrent)
     }
 }

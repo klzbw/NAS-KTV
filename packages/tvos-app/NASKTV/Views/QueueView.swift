@@ -33,7 +33,6 @@ struct QueueView: View {
                     // 队列列表
                     if viewModel.isLoading {
                         ProgressView("加载中...")
-                            .controlSize(.large)
                             .padding(.top, 80)
                     } else if viewModel.queue.isEmpty {
                         ContentUnavailableView(
@@ -108,7 +107,7 @@ struct QueueRow: View {
                 Text(item.song?.title ?? "未知歌曲")
                     .font(.headline)
                     .lineLimit(1)
-                    .foregroundStyle(item.isPlaying ? .tint : .primary)
+                    .foregroundStyle(item.isPlaying ? AnyShapeStyle(.tint) : AnyShapeStyle(.primary))
                 Text(item.song?.artistName ?? "未知歌手")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
@@ -139,7 +138,7 @@ struct QueueRow: View {
             .buttonStyle(.plain)
         }
         .padding(16)
-        .background(item.isPlaying ? Color.tint.opacity(0.1) : .regularMaterial)
+        .background(item.isPlaying ? Color.accentColor.opacity(0.1) : .regularMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .contextMenu {
             Button("播放", action: onPlay)

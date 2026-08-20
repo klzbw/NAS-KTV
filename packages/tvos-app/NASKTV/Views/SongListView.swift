@@ -23,7 +23,6 @@ struct SongListView: View {
 
                 if libraryViewModel.isLoading {
                     ProgressView()
-                        .controlSize(.large)
                         .padding(.vertical, 20)
                 }
             }

@@ -59,7 +59,6 @@ struct ServerSetupView: View {
                             .padding(.horizontal, 40)
                     }
                     .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
 
                     // 错误提示
                     if let error = viewModel.errorMessage {
@@ -71,7 +70,6 @@ struct ServerSetupView: View {
                     // 连接中
                     if viewModel.isConnecting {
                         ProgressView("正在连接...")
-                            .controlSize(.large)
                     }
                 }
                 .padding(.bottom, 60)
@@ -137,7 +135,6 @@ struct ServerCard: View {
 
             Button("连接", action: onConnect)
                 .buttonStyle(.borderedProminent)
-                .controlSize(.large)
 
             Menu {
                 Button("设为默认", action: onSetDefault)
