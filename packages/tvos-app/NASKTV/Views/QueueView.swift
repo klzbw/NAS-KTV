@@ -138,7 +138,7 @@ struct QueueRow: View {
             .buttonStyle(.plain)
         }
         .padding(16)
-        .background(item.isPlaying ? Color.accentColor.opacity(0.1) : .regularMaterial)
+        .background(item.isPlaying ? AnyShapeStyle(Color.accentColor.opacity(0.1)) : AnyShapeStyle(.regularMaterial))
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .contextMenu {
             Button("播放", action: onPlay)
