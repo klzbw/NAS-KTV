@@ -298,6 +298,23 @@ jobs:
               cp NASKTV/Info.plist build/ipa/Payload/NASKTV.app/Info.plist
             fi
             
+            # 修复Info.plist中的构建变量
+            IPA_PLIST="build/ipa/Payload/NASKTV.app/Info.plist"
+            if [ -f "$IPA_PLIST" ]; then
+              echo "=== Fixing Info.plist variables ==="
+              # 使用plutil替换变量
+              plutil -replace CFBundleExecutable -string "NASKTV" "$IPA_PLIST"
+              plutil -replace CFBundleIdentifier -string "com.nasktv.app" "$IPA_PLIST"
+              plutil -replace CFBundleName -string "NASKTV" "$IPA_PLIST"
+              # 确保支持tvOS平台
+              plutil -replace CFBundleSupportedPlatforms -json '["AppleTVOS"]' "$IPA_PLIST" 2>/dev/null || true
+              echo "Info.plist fixed:"
+              plutil -p "$IPA_PLIST" | grep -E "CFBundleExecutable|CFBundleIdentifier|CFBundleName"
+            fi
+            
+            # 确保可执行文件有执行权限
+            chmod +x build/ipa/Payload/NASKTV.app/NASKTV 2>/dev/null || true
+            
             # 压缩成IPA
             cd build/ipa
             zip -r ../NASKTV-tvOS-Unsigned.ipa Payload
