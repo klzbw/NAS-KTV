@@ -227,6 +227,93 @@ jobs:
             find build -type f | head -50
           fi
 
+      - name: Build Unsigned IPA (Device)
+        if: ${{ github.event.inputs.sign != 'true' && !startsWith(github.ref, 'refs/tags/v') }}
+        run: |
+          cd ${{ env.PROJECT_PATH }}
+          echo "=== Building unsigned device version ==="
+          
+          # 预先创建.app目录并复制Info.plist
+          DEVICE_APP_PATH="build/Build/Products/Release-appletvos/NASKTV.app"
+          mkdir -p "$DEVICE_APP_PATH"
+          if [ -f "NASKTV/Info.plist" ]; then
+            cp NASKTV/Info.plist "$DEVICE_APP_PATH/Info.plist"
+            echo "Info.plist pre-copied"
+          fi
+          
+          # 构建真实设备版本（不签名）
+          xcodebuild \
+            -project NASKTV.xcodeproj \
+            -scheme NASKTV \
+            -configuration Release \
+            -sdk appletvos \
+            -destination 'generic/platform=tvOS' \
+            -derivedDataPath build \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            build 2>&1 | tee build-device.log
+          BUILD_EXIT=${PIPESTATUS[0]}
+          echo "Device build exit code: $BUILD_EXIT"
+          
+          # 如果第一次构建失败，复制Info.plist后重试
+          if [ $BUILD_EXIT -ne 0 ]; then
+            echo "First device build failed, retrying..."
+            if [ -d "$DEVICE_APP_PATH" ] && [ -f "NASKTV/Info.plist" ]; then
+              cp NASKTV/Info.plist "$DEVICE_APP_PATH/Info.plist"
+              xcodebuild \
+                -project NASKTV.xcodeproj \
+                -scheme NASKTV \
+                -configuration Release \
+                -sdk appletvos \
+                -destination 'generic/platform=tvOS' \
+                -derivedDataPath build \
+                CODE_SIGN_IDENTITY="" \
+                CODE_SIGNING_REQUIRED=NO \
+                CODE_SIGNING_ALLOWED=NO \
+                build 2>&1 | tee build-device2.log
+              BUILD_EXIT=${PIPESTATUS[0]}
+              echo "Retry device build exit code: $BUILD_EXIT"
+            fi
+          fi
+          
+          if [ $BUILD_EXIT -ne 0 ]; then
+            echo "Device build failed, showing last 100 lines"
+            tail -100 build-device.log
+            exit $BUILD_EXIT
+          fi
+          
+          echo "=== Packaging unsigned IPA ==="
+          # 找到构建好的.app
+          DEVICE_APP=$(find build/Build/Products -path "*appletvos*" -name "NASKTV.app" -type d | head -1)
+          echo "Device app path: $DEVICE_APP"
+          
+          if [ -n "$DEVICE_APP" ]; then
+            # 创建IPA结构
+            mkdir -p build/ipa/Payload
+            cp -R "$DEVICE_APP" build/ipa/Payload/
+            
+            # 确保Info.plist存在
+            if [ ! -f "build/ipa/Payload/NASKTV.app/Info.plist" ] && [ -f "NASKTV/Info.plist" ]; then
+              cp NASKTV/Info.plist build/ipa/Payload/NASKTV.app/Info.plist
+            fi
+            
+            # 压缩成IPA
+            cd build/ipa
+            zip -r ../NASKTV-tvOS-Unsigned.ipa Payload
+            cd ../..
+            
+            echo "Unsigned IPA packaged successfully"
+            ls -la build/NASKTV-tvOS-Unsigned.ipa
+            
+            # 显示IPA内容
+            echo "=== IPA contents ==="
+            unzip -l build/NASKTV-tvOS-Unsigned.ipa | head -30
+          else
+            echo "WARNING: No device app found"
+            find build/Build/Products -type d | head -20
+          fi
+
       - name: Upload Build Artifact (Simulator)
         if: ${{ github.event.inputs.sign != 'true' && !startsWith(github.ref, 'refs/tags/v') }}
         uses: actions/upload-artifact@v4
@@ -234,6 +321,15 @@ jobs:
           name: NASKTV-tvOS-Simulator
           path: packages/tvos-app/build/NASKTV-tvOS-Simulator.zip
           retention-days: 30
+          if-no-files-found: warn
+
+      - name: Upload Build Artifact (Unsigned IPA)
+        if: ${{ github.event.inputs.sign != 'true' && !startsWith(github.ref, 'refs/tags/v') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: NASKTV-tvOS-Unsigned-IPA
+          path: packages/tvos-app/build/NASKTV-tvOS-Unsigned.ipa
+          retention-days: 90
           if-no-files-found: warn
 
       - name: Upload Build Artifact (IPA)
