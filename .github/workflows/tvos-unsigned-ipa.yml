@@ -1,0 +1,131 @@
+name: tvOS Unsigned IPA Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      configuration:
+        description: 'Build configuration'
+        required: true
+        default: 'Release'
+        type: choice
+        options:
+          - Debug
+          - Release
+  push:
+    paths:
+      - 'packages/tvos-app/**'
+      - '.github/workflows/tvos-unsigned-ipa.yml'
+
+env:
+  PROJECT_PATH: packages/tvos-app
+  SCHEME: NASKTV
+  CONFIGURATION: ${{ github.event.inputs.configuration || 'Release' }}
+
+jobs:
+  build-unsigned-ipa:
+    name: Build Unsigned tvOS IPA
+    runs-on: macos-14
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select latest Xcode
+        run: |
+          LATEST_XCODE=$(ls -d /Applications/Xcode*.app 2>/dev/null | sort -V | tail -1)
+          if [ -n "$LATEST_XCODE" ]; then
+            echo "Selecting Xcode: $LATEST_XCODE"
+            sudo xcode-select -s "$LATEST_XCODE/Contents/Developer"
+          fi
+          xcodebuild -version
+          echo "=== tvOS SDKs ==="
+          xcodebuild -showsdks | grep -i tvos
+
+      - name: Verify project
+        run: |
+          cd ${{ env.PROJECT_PATH }}
+          xcodebuild -list -project NASKTV.xcodeproj 2>&1 || true
+          echo "=== Source files ==="
+          find NASKTV -name "*.swift" | sort
+
+      - name: Build for tvOS Device (Unsigned)
+        run: |
+          cd ${{ env.PROJECT_PATH }}
+          echo "=== Starting unsigned device build ==="
+          xcodebuild \
+            -project NASKTV.xcodeproj \
+            -scheme NASKTV \
+            -configuration "${{ env.CONFIGURATION }}" \
+            -sdk appletvos \
+            -destination 'generic/platform=tvOS' \
+            -derivedDataPath build \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_ENTITLEMENTS="" \
+            VALIDATE_PRODUCT=NO \
+            build 2>&1 | tee build.log
+          BUILD_EXIT=${PIPESTATUS[0]}
+          echo ""
+          echo "=== Build exit code: $BUILD_EXIT ==="
+
+          # 确保 Info.plist 在 .app 中
+          APP_PATH="build/Build/Products/${{ env.CONFIGURATION }}-appletvos/NASKTV.app"
+          if [ -d "$APP_PATH" ] && [ -f "NASKTV/Info.plist" ]; then
+            echo "=== Copying Info.plist to .app ==="
+            cp NASKTV/Info.plist "$APP_PATH/Info.plist"
+          fi
+
+          if [ $BUILD_EXIT -ne 0 ]; then
+            echo "=== Build failed, last 150 lines ==="
+            tail -150 build.log
+            exit $BUILD_EXIT
+          fi
+
+      - name: Package as Unsigned IPA
+        run: |
+          cd ${{ env.PROJECT_PATH }}
+          APP_PATH=$(find build/Build/Products -name "NASKTV.app" -type d | head -1)
+          echo "App path: $APP_PATH"
+
+          if [ -z "$APP_PATH" ] || [ ! -d "$APP_PATH" ]; then
+            echo "ERROR: NASKTV.app not found"
+            find build -name "*.app" -type d 2>/dev/null || true
+            exit 1
+          fi
+
+          # 创建 IPA 结构: Payload/NASKTV.app
+          mkdir -p build/ipa/Payload
+          cp -R "$APP_PATH" build/ipa/Payload/
+
+          # 移除代码签名相关文件（确保未签名）
+          rm -rf build/ipa/Payload/NASKTV.app/_CodeSignature
+          rm -f build/ipa/Payload/NASKTV.app/embedded.mobileprovision
+
+          cd build/ipa
+          IPA_NAME="NASKTV-tvOS-unsigned-${{ env.CONFIGURATION }}.ipa"
+          zip -r "../$IPA_NAME" Payload
+          echo ""
+          echo "=== IPA created: $IPA_NAME ==="
+          ls -la "../$IPA_NAME"
+          echo ""
+          echo "=== IPA contents ==="
+          unzip -l "../$IPA_NAME" | head -30
+
+      - name: Upload Unsigned IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: NASKTV-tvOS-unsigned-ipa
+          path: packages/tvos-app/build/NASKTV-tvOS-unsigned-*.ipa
+          retention-days: 90
+          if-no-files-found: error
+
+      - name: Upload build logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tvos-build-logs
+          path: packages/tvos-app/build.log
+          retention-days: 30
+          if-no-files-found: ignore
