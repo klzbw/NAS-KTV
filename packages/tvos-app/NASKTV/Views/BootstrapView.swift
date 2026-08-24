@@ -105,5 +105,13 @@ struct BootstrapView: View {
             .padding(.bottom, 20)
         }
         .padding()
+        .onAppear {
+            if viewModel.room != nil && !viewModel.authorized {
+                viewModel.startAuthorizationPolling()
+            }
+        }
+        .onDisappear {
+            viewModel.stopAuthorizationPolling()
+        }
     }
 }

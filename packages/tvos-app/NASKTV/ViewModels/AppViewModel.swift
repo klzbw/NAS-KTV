@@ -39,7 +39,9 @@ final class AppViewModel: ObservableObject {
     private var lastQueueVersion: Int = 0
     private var isDeleting = false
     private var ticketRefreshTask: Task<Void, Never>?
+    private var authorizationPollingTask: Task<Void, Never>?
     private var isFirstTicketLoad = true
+    private var isTicketRefreshing = false
 
     init() {
         loadConfig()
@@ -110,10 +112,13 @@ final class AppViewModel: ObservableObject {
     }
 
     func startJoinTicketRefresh() {
+        guard !isTicketRefreshing else { return }
         stopJoinTicketRefresh()
+        isTicketRefreshing = true
         isFirstTicketLoad = true
         ticketRefreshTask = Task { [weak self] in
             guard let self = self else { return }
+            defer { self.isTicketRefreshing = false }
             while !Task.isCancelled {
                 guard let room = self.room, room.isAuthorized else {
                     try? await Task.sleep(nanoseconds: 5_000_000_000)
@@ -144,6 +149,64 @@ final class AppViewModel: ObservableObject {
         ticketRefreshTask = nil
     }
 
+    // MARK: - Authorization Polling
+    func startAuthorizationPolling() {
+        stopAuthorizationPolling()
+        authorizationPollingTask = Task { [weak self] in
+            while !Task.isCancelled {
+                guard let self = self, let room = self.room else {
+                    try? await Task.sleep(nanoseconds: 5_000_000_000)
+                    continue
+                }
+                do {
+                    let updated = try await APIService.shared.getRoom(code: room.code)
+                    if let updated = updated, updated.isAuthorized {
+                        await MainActor.run {
+                            self.room = updated
+                            self.authorized = true
+                            self.connectWebSocket()
+                            self.loadH5Url()
+                            self.startJoinTicketRefresh()
+                        }
+                        return
+                    }
+                } catch {
+                    print("Authorization polling error: \(error)")
+                }
+                try? await Task.sleep(nanoseconds: 5_000_000_000)
+            }
+        }
+    }
+
+    func stopAuthorizationPolling() {
+        authorizationPollingTask?.cancel()
+        authorizationPollingTask = nil
+    }
+
+    // MARK: - App Lifecycle
+    func handleAppForeground() {
+        Task {
+            if isConfigured {
+                if room == nil {
+                    await registerDevice()
+                } else if authorized {
+                    connectWebSocket()
+                    loadH5Url()
+                    startJoinTicketRefresh()
+                } else {
+                    startAuthorizationPolling()
+                }
+            }
+        }
+    }
+
+    func handleAppBackground() {
+        stopJoinTicketRefresh()
+        stopAuthorizationPolling()
+        WebSocketService.shared.disconnect()
+        wsStatus = .disconnected
+    }
+
     // MARK: - Device ID
     private func loadDeviceId() {
         if let id = UserDefaults.standard.string(forKey: "nasktv_device_id"), !id.isEmpty {
@@ -162,7 +225,7 @@ final class AppViewModel: ObservableObject {
 
     // MARK: - Registration
     func registerDevice() async {
-        guard isConfigured else { return }
+        guard isConfigured, !isRegistering else { return }
         isRegistering = true
         errorMessage = nil
         do {

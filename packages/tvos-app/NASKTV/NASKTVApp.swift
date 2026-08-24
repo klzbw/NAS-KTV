@@ -3,6 +3,7 @@ import SwiftUI
 @main
 struct NASKTVApp: App {
     @StateObject private var viewModel = AppViewModel()
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {
         WindowGroup {
@@ -23,6 +24,16 @@ struct NASKTVApp: App {
             .onAppear {
                 if viewModel.isConfigured && viewModel.room == nil {
                     Task { await viewModel.registerDevice() }
+                }
+            }
+            .onChange(of: scenePhase) { _, newPhase in
+                switch newPhase {
+                case .active:
+                    viewModel.handleAppForeground()
+                case .background:
+                    viewModel.handleAppBackground()
+                default:
+                    break
                 }
             }
         }
