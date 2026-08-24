@@ -55,16 +55,35 @@ struct AnyCodable: Codable {
         switch value {
         case let int as Int:
             try container.encode(int)
+        case let int64 as Int64:
+            try container.encode(int64)
         case let double as Double:
             try container.encode(double)
         case let bool as Bool:
             try container.encode(bool)
         case let string as String:
             try container.encode(string)
+        case let array as [Any]:
+            try container.encode(array.map { AnyCodable($0) })
+        case let dict as [String: Any]:
+            try container.encode(dict.mapValues { AnyCodable($0) })
         case is NSNull:
             try container.encodeNil()
         default:
             try container.encodeNil()
+        }
+    }
+}
+
+extension WsMessage {
+    func decodePayload<T: Decodable>(_ type: T.Type) -> T? {
+        guard let payload = payload else { return nil }
+        do {
+            let data = try JSONEncoder().encode(payload)
+            return try JSONDecoder().decode(T.self, from: data)
+        } catch {
+            print("Payload decode error for \(T.self): \(error)")
+            return nil
         }
     }
 }

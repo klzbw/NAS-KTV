@@ -132,50 +132,41 @@ final class AppViewModel: ObservableObject {
 
         // Room state snapshot
         WebSocketService.shared.on(.ROOM_STATE_SNAPSHOT) { [weak self] message in
-            guard let self = self, let payload = message.payload else { return }
+            guard let self = self else { return }
             DispatchQueue.main.async {
-                if let version = payload["queueVersion"]?.value as? Int {
-                    self.lastQueueVersion = version
-                }
-                if let queueData = try? JSONSerialization.data(withJSONObject: payload["queue"]?.value as Any ?? []),
-                   let queue = try? JSONDecoder().decode([QueueListItem].self, from: queueData) {
-                    self.queue = queue
-                    self.currentItem = queue.first { $0.isPlaying }
-                }
-                if let authorized = payload["authorized"]?.value as? Bool {
-                    self.authorized = authorized
-                }
-                if let playerStateData = try? JSONSerialization.data(withJSONObject: payload["playerState"]?.value as Any ?? [:]),
-                   let playerState = try? JSONDecoder().decode(PlayerStatePayload.self, from: playerStateData) {
-                    self.playerState = playerState
+                if let snapshot = message.decodePayload(RoomStateSnapshotPayload.self) {
+                    if let version = snapshot.queueVersion {
+                        self.lastQueueVersion = version
+                    }
+                    self.queue = snapshot.queue
+                    self.currentItem = snapshot.queue.first { $0.isPlaying }
+                    self.authorized = snapshot.authorized
+                    self.playerState = snapshot.playerState
                 }
             }
         }
 
         // Queue updated
         WebSocketService.shared.on(.QUEUE_UPDATED) { [weak self] message in
-            guard let self = self, let payload = message.payload else { return }
+            guard let self = self else { return }
             DispatchQueue.main.async {
-                if let version = payload["queueVersion"]?.value as? Int, version < self.lastQueueVersion {
-                    return
-                }
-                if let version = payload["queueVersion"]?.value as? Int {
-                    self.lastQueueVersion = max(self.lastQueueVersion, version)
-                }
-                if let queueData = try? JSONSerialization.data(withJSONObject: payload["queue"]?.value as Any ?? []),
-                   let queue = try? JSONDecoder().decode([QueueListItem].self, from: queueData) {
-                    self.queue = queue
-                    self.currentItem = queue.first { $0.isPlaying }
+                if let updated = message.decodePayload(QueueUpdatedPayload.self) {
+                    if let version = updated.queueVersion, version < self.lastQueueVersion {
+                        return
+                    }
+                    if let version = updated.queueVersion {
+                        self.lastQueueVersion = max(self.lastQueueVersion, version)
+                    }
+                    self.queue = updated.queue
+                    self.currentItem = updated.queue.first { $0.isPlaying }
                 }
             }
         }
 
         // Player state updated
         WebSocketService.shared.on(.PLAYER_STATE_UPDATED) { [weak self] message in
-            guard let payload = message.payload else { return }
             DispatchQueue.main.async {
-                if let data = try? JSONSerialization.data(withJSONObject: payload),
-                   let state = try? JSONDecoder().decode(PlayerStatePayload.self, from: data) {
+                if let state = message.decodePayload(PlayerStatePayload.self) {
                     self?.playerState = state
                 }
             }
