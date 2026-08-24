@@ -22,11 +22,11 @@ struct Room: Codable, Identifiable {
 
 // MARK: - RoomJoinTicket
 struct RoomJoinTicket: Codable {
-    let ticket: String
+    let authorizationCode: String
     let expiresAt: String
 
     enum CodingKeys: String, CodingKey {
-        case ticket
+        case authorizationCode = "authorization_code"
         case expiresAt = "expires_at"
     }
 }

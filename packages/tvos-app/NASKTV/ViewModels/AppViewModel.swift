@@ -28,12 +28,18 @@ final class AppViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var isRegistering = false
 
+    // QR Code / Join Ticket
+    @Published var joinTicket: RoomJoinTicket?
+    @Published var h5BaseUrl: String = ""
+
     // Device
     private(set) var deviceId: String = ""
 
     private var cancellables = Set<AnyCancellable>()
     private var lastQueueVersion: Int = 0
     private var isDeleting = false
+    private var ticketRefreshTask: Task<Void, Never>?
+    private var isFirstTicketLoad = true
 
     init() {
         loadConfig()
@@ -71,6 +77,71 @@ final class AppViewModel: ObservableObject {
         self.apiUrl = ""
         self.wsUrl = ""
         self.isConfigured = false
+    }
+
+    // MARK: - QR Code
+    var qrText: String {
+        guard !h5BaseUrl.isEmpty, let ticket = joinTicket else { return "" }
+        let base = h5BaseUrl.replacingOccurrences(of: "/+$", with: "", options: .regularExpression)
+        return "\(base)/join?authorizationCode=\(ticket.authorizationCode)"
+    }
+
+    func loadH5Url() {
+        Task {
+            do {
+                let url = try await APIService.shared.getH5Url()
+                await MainActor.run {
+                    if !url.isEmpty {
+                        self.h5BaseUrl = url
+                    } else if !apiUrl.isEmpty {
+                        let derived = apiUrl.replacingOccurrences(of: "/api/?$", with: "", options: .regularExpression) + "/h5"
+                        self.h5BaseUrl = derived
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    if !apiUrl.isEmpty {
+                        let derived = apiUrl.replacingOccurrences(of: "/api/?$", with: "", options: .regularExpression) + "/h5"
+                        self.h5BaseUrl = derived
+                    }
+                }
+            }
+        }
+    }
+
+    func startJoinTicketRefresh() {
+        stopJoinTicketRefresh()
+        isFirstTicketLoad = true
+        ticketRefreshTask = Task { [weak self] in
+            guard let self = self else { return }
+            while !Task.isCancelled {
+                guard let room = self.room, room.isAuthorized else {
+                    try? await Task.sleep(nanoseconds: 5_000_000_000)
+                    continue
+                }
+                do {
+                    let ticket = try await APIService.shared.issueJoinTicket(
+                        roomId: room.id,
+                        deviceId: room.deviceId,
+                        forceRotate: self.isFirstTicketLoad
+                    )
+                    self.isFirstTicketLoad = false
+                    await MainActor.run {
+                        self.joinTicket = ticket
+                    }
+                    let expiresAt = ISO8601DateFormatter().date(from: ticket.expiresAt) ?? Date().addingTimeInterval(60)
+                    let delay = max(5.0, min(30.0, expiresAt.timeIntervalSinceNow - 60))
+                    try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                } catch {
+                    try? await Task.sleep(nanoseconds: 10_000_000_000)
+                }
+            }
+        }
+    }
+
+    func stopJoinTicketRefresh() {
+        ticketRefreshTask?.cancel()
+        ticketRefreshTask = nil
     }
 
     // MARK: - Device ID
@@ -142,6 +213,13 @@ final class AppViewModel: ObservableObject {
                     self.currentItem = snapshot.queue.first { $0.isPlaying }
                     self.authorized = snapshot.authorized
                     self.playerState = snapshot.playerState
+                    if snapshot.authorized {
+                        self.loadH5Url()
+                        self.startJoinTicketRefresh()
+                    } else {
+                        self.stopJoinTicketRefresh()
+                        self.joinTicket = nil
+                    }
                 }
             }
         }
@@ -177,6 +255,8 @@ final class AppViewModel: ObservableObject {
             DispatchQueue.main.async {
                 self?.authorized = true
                 self?.expiresAt = nil
+                self?.loadH5Url()
+                self?.startJoinTicketRefresh()
             }
         }
 
@@ -195,6 +275,8 @@ final class AppViewModel: ObservableObject {
             DispatchQueue.main.async {
                 self?.authorized = false
                 self?.expiresAt = nil
+                self?.stopJoinTicketRefresh()
+                self?.joinTicket = nil
             }
         }
 

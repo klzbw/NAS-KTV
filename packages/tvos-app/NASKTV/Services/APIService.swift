@@ -42,6 +42,16 @@ final class APIService {
         return response.data?["h5BaseUrl"] ?? ""
     }
 
+    func issueJoinTicket(roomId: Int, deviceId: String, forceRotate: Bool = false) async throws -> RoomJoinTicket {
+        let body: [String: Any] = [
+            "deviceId": deviceId,
+            "forceRotate": forceRotate
+        ]
+        let response: APIResponse<RoomJoinTicket> = try await post("/rooms/\(roomId)/join-ticket", body: body)
+        guard let data = response.data else { throw APIError.noData }
+        return data
+    }
+
     func getQRCodeURL(data: String) -> URL? {
         let encoded = data.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? data
         return URL(string: "\(baseURL)/rooms/qrcode?data=\(encoded)")

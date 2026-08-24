@@ -112,6 +112,13 @@ struct NowPlayingView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
+            .overlay(alignment: .topTrailing) {
+                if !viewModel.qrText.isEmpty {
+                    QRCodeBadge()
+                        .padding(.top, 20)
+                        .padding(.trailing, 20)
+                }
+            }
             .navigationTitle("正在播放")
             .onChange(of: viewModel.currentItem?.songId) { newId in
                 if let id = newId {
@@ -181,5 +188,40 @@ struct LyricsView: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - QRCodeBadge
+struct QRCodeBadge: View {
+    @EnvironmentObject var viewModel: AppViewModel
+
+    var body: some View {
+        VStack(spacing: 8) {
+            Text("手机扫码点歌")
+                .font(.caption)
+                .fontWeight(.medium)
+                .foregroundColor(.accentColor)
+
+            QRCodeImageView(content: viewModel.qrText, size: 140)
+
+            if let code = viewModel.joinTicket?.authorizationCode {
+                Text("授权码: \(code)")
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundColor(.secondary)
+            } else {
+                Text("授权码: 更新中")
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundColor(.secondary)
+            }
+        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.black.opacity(0.7))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.accentColor.opacity(0.5), lineWidth: 1)
+        )
     }
 }
