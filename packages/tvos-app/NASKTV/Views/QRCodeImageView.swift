@@ -5,7 +5,7 @@ import CoreImage.CIFilterBuiltins
 // MARK: - QRCodeImageView
 struct QRCodeImageView: View {
     let content: String
-    var size: CGFloat = 200
+    var size: CGFloat = 180
 
     private var qrImage: UIImage? {
         guard !content.isEmpty else { return nil }

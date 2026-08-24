@@ -20,12 +20,18 @@ final class APIService {
         self.baseURL = cleaned.hasSuffix("/api") ? cleaned : "\(cleaned)/api"
     }
 
+    // MARK: - Health
+    func healthCheck() async throws -> Bool {
+        let _: APIResponse<AnyCodable> = try await get("/health")
+        return true
+    }
+
     // MARK: - Rooms
     func registerDevice(deviceId: String, name: String?, deviceInfo: String?) async throws -> Room {
         let body: [String: Any] = [
             "deviceId": deviceId,
             "name": name ?? "Apple TV",
-            "deviceInfo": deviceInfo ?? "tvOS/iOS"
+            "deviceInfo": deviceInfo ?? "tvOS"
         ]
         let response: APIResponse<Room> = try await post("/rooms/register", body: body)
         guard let data = response.data else { throw APIError.noData }
@@ -59,15 +65,9 @@ final class APIService {
         return data
     }
 
-    func getQRCodeURL(data: String) -> URL? {
-        let encoded = data.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? data
-        return URL(string: "\(baseURL)/rooms/qrcode?data=\(encoded)")
-    }
-
     // MARK: - Songs
     func getLyrics(songId: Int) async throws -> [LyricLine] {
         let response: APIResponse<AnyCodable> = try await get("/songs/\(songId)/lyrics")
-        // Backend returns { lines, wordTiming } or array
         guard let data = response.data?.value as? [String: Any],
               let lines = data["lines"] as? [[String: Any]] else {
             if let array = response.data?.value as? [[String: Any]] {
@@ -86,21 +86,27 @@ final class APIService {
         }
     }
 
-    func getSongs(limit: Int = 50, offset: Int = 0) async throws -> [Song] {
-        let response: APIResponse<[Song]> = try await get("/songs?limit=\(limit)&offset=\(offset)")
-        return response.data ?? []
+    func getAudioUrl(songId: Int) -> String {
+        return "\(baseURL)/songs/\(songId)/audio"
     }
 
-    func searchSongs(query: String) async throws -> [Song] {
-        let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
-        let response: APIResponse<[Song]> = try await get("/songs/search?q=\(encoded)")
-        return response.data ?? []
+    func getInstrumentalUrl(songId: Int) -> String {
+        return "\(baseURL)/songs/\(songId)/instrumental"
     }
 
-    // MARK: - Queue
-    func getQueue(roomId: Int) async throws -> [QueueListItem] {
-        let response: APIResponse<[QueueListItem]> = try await get("/rooms/\(roomId)/queue")
-        return response.data ?? []
+    func getVocalsUrl(songId: Int) -> String {
+        return "\(baseURL)/songs/\(songId)/vocals"
+    }
+
+    // MARK: - Queue control
+    func skipSong(roomId: Int, deviceId: String, queueItemId: Int) async throws {
+        let body: [String: Any] = ["deviceId": deviceId]
+        let _: APIResponse<AnyCodable> = try await post("/rooms/\(roomId)/queue/\(queueItemId)/skip", body: body)
+    }
+
+    func completeSong(roomId: Int, deviceId: String, queueItemId: Int) async throws {
+        let body: [String: Any] = ["deviceId": deviceId]
+        let _: APIResponse<AnyCodable> = try await post("/rooms/\(roomId)/queue/\(queueItemId)/complete", body: body)
     }
 
     // MARK: - Generic

@@ -9,11 +9,6 @@
       "idiom" : "tv",
       "scale" : "2x",
       "size" : "408x272"
-    },
-    {
-      "idiom" : "universal",
-      "platform" : "ios",
-      "size" : "1024x1024"
     }
   ],
   "info" : {

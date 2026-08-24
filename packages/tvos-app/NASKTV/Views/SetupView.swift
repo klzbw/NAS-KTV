@@ -7,75 +7,80 @@ struct SetupView: View {
     @State private var wsUrlInput: String = ""
 
     var body: some View {
-        VStack(spacing: 40) {
+        VStack(spacing: 30) {
             Spacer()
 
             // Logo
-            VStack(spacing: 16) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 20)
-                        .fill(Color.accentColor.opacity(0.15))
-                        .frame(width: 100, height: 100)
-                    Text("N")
-                        .font(.system(size: 48, weight: .bold))
-                        .foregroundColor(.accentColor)
-                }
-                Text("NAS-KTV")
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
-                Text("请配置后端服务器地址")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
+            ZStack {
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color.accentColor.opacity(0.15))
+                    .frame(width: 80, height: 80)
+                Text("N")
+                    .font(.system(size: 36, weight: .bold))
+                    .foregroundColor(.accentColor)
             }
 
-            // Form
-            VStack(spacing: 20) {
-                VStack(alignment: .leading, spacing: 8) {
+            Text("NAS-KTV")
+                .font(.title)
+                .fontWeight(.bold)
+
+            Text("配置服务器地址")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+
+            // Input fields
+            VStack(spacing: 16) {
+                VStack(alignment: .leading, spacing: 6) {
                     Text("API 地址")
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    TextField("http://192.168.3.16:3000", text: $apiUrlInput)
+                    TextField("http://192.168.1.100:3000/api", text: $apiUrlInput)
+                        .textFieldStyle(.roundedBorder)
                         .autocapitalization(.none)
                         .disableAutocorrection(true)
                 }
 
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 6) {
                     Text("WebSocket 地址")
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    TextField("ws://192.168.3.16:3000", text: $wsUrlInput)
+                    TextField("ws://192.168.1.100:3000", text: $wsUrlInput)
+                        .textFieldStyle(.roundedBorder)
                         .autocapitalization(.none)
                         .disableAutocorrection(true)
                 }
-
-                if let error = viewModel.errorMessage {
-                    Text(error)
-                        .font(.caption)
-                        .foregroundColor(.red)
-                }
-
-                Button(action: {
-                    let api = apiUrlInput.trimmingCharacters(in: .whitespaces)
-                    let ws = wsUrlInput.trimmingCharacters(in: .whitespaces)
-                    viewModel.saveConfig(apiUrl: api, wsUrl: ws)
-                    Task { await viewModel.registerDevice() }
-                }) {
-                    HStack {
-                        if viewModel.isRegistering {
-                            ProgressView()
-                        }
-                        Text("连接并注册设备")
-                            .fontWeight(.semibold)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.accentColor)
-                    .foregroundColor(.white)
-                    .cornerRadius(12)
-                }
-                .disabled(apiUrlInput.isEmpty || viewModel.isRegistering)
             }
-            .padding(.horizontal, 60)
+            .frame(maxWidth: 500)
+            .padding(.horizontal, 40)
+
+            if let error = viewModel.bootstrapError {
+                Text(error)
+                    .font(.caption)
+                    .foregroundColor(.red)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 500)
+            }
+
+            // Save button
+            Button(action: {
+                let api = apiUrlInput.trimmingCharacters(in: .whitespaces)
+                let ws = wsUrlInput.trimmingCharacters(in: .whitespaces)
+                guard !api.isEmpty else { return }
+                let wsFinal = ws.isEmpty ? api.replacingOccurrences(of: "/api", with: "").replacingOccurrences(of: "http", with: "ws") : ws
+                viewModel.saveConfig(apiUrl: api, wsUrl: wsFinal)
+                Task { await viewModel.bootstrap() }
+            }) {
+                if viewModel.isRegistering {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                } else {
+                    Text("保存并连接")
+                        .fontWeight(.semibold)
+                }
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .disabled(apiUrlInput.isEmpty || viewModel.isRegistering)
 
             Spacer()
         }

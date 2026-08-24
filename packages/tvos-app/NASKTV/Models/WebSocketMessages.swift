@@ -108,7 +108,6 @@ struct RoomStateSnapshotPayload: Codable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         queue = try container.decode([QueueListItem].self, forKey: .queue)
         queueVersion = try container.decodeIfPresent(Int.self, forKey: .queueVersion)
-        // authorized 可能是 Bool 或 Int (0/1)
         if let boolVal = try? container.decode(Bool.self, forKey: .authorized) {
             authorized = boolVal
         } else if let intVal = try? container.decode(Int.self, forKey: .authorized) {

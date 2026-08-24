@@ -14,7 +14,7 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "A1000000000000000000009"
+               BlueprintIdentifier = "A1000027000000000000A01"
                BuildableName = "NASKTV.app"
                BlueprintName = "NASKTV"
                ReferencedContainer = "container:NASKTV.xcodeproj">
@@ -44,7 +44,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "A1000000000000000000009"
+            BlueprintIdentifier = "A1000027000000000000A01"
             BuildableName = "NASKTV.app"
             BlueprintName = "NASKTV"
             ReferencedContainer = "container:NASKTV.xcodeproj">
@@ -61,7 +61,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "A1000000000000000000009"
+            BlueprintIdentifier = "A1000027000000000000A01"
             BuildableName = "NASKTV.app"
             BlueprintName = "NASKTV"
             ReferencedContainer = "container:NASKTV.xcodeproj">

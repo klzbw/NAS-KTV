@@ -23,7 +23,6 @@ final class WebSocketService: NSObject, URLSessionWebSocketDelegate {
     private let heartbeatInterval: TimeInterval = 25
     private let maxReconnectDelay: TimeInterval = 30
 
-    // Message handlers
     private var handlers: [WsMessageType: [(WsMessage) -> Void]] = [:]
     private var statusHandlers: [(ConnectionStatus) -> Void] = []
 
@@ -82,7 +81,6 @@ final class WebSocketService: NSObject, URLSessionWebSocketDelegate {
                 }
                 self.receiveMessage()
             case .failure:
-                // Connection closed, will be handled by delegate
                 break
             }
         }

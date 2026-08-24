@@ -55,30 +55,6 @@ struct Song: Codable, Identifiable {
     }
 }
 
-// MARK: - Artist
-struct Artist: Codable, Identifiable {
-    let id: Int
-    let name: String
-    let songCount: Int?
-
-    enum CodingKeys: String, CodingKey {
-        case id, name
-        case songCount = "song_count"
-    }
-}
-
-// MARK: - Category
-struct Category: Codable, Identifiable {
-    let id: Int
-    let name: String
-    let songCount: Int?
-
-    enum CodingKeys: String, CodingKey {
-        case id, name
-        case songCount = "song_count"
-    }
-}
-
 // MARK: - QueueListItem
 struct QueueListItem: Codable, Identifiable {
     let id: Int
@@ -89,6 +65,10 @@ struct QueueListItem: Codable, Identifiable {
     let addedBy: String?
     let addedAt: String?
     let position: Int?
+    let nickname: String?
+    let fileType: String?
+    let vocalsPath: String?
+    let instrumentalPath: String?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -99,6 +79,10 @@ struct QueueListItem: Codable, Identifiable {
         case addedBy = "added_by"
         case addedAt = "added_at"
         case position
+        case nickname
+        case fileType = "file_type"
+        case vocalsPath = "vocals_path"
+        case instrumentalPath = "instrumental_path"
     }
 
     var isPlaying: Bool { status == "playing" }

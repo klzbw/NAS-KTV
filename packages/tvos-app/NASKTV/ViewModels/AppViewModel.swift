@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import UIKit
 
 // MARK: - AppViewModel
 final class AppViewModel: ObservableObject {
@@ -27,6 +28,7 @@ final class AppViewModel: ObservableObject {
     @Published var wsStatus: ConnectionStatus = .disconnected
     @Published var errorMessage: String?
     @Published var isRegistering = false
+    @Published var bootstrapError: String?
 
     // QR Code / Join Ticket
     @Published var joinTicket: RoomJoinTicket?
@@ -39,14 +41,13 @@ final class AppViewModel: ObservableObject {
     private var lastQueueVersion: Int = 0
     private var isDeleting = false
     private var ticketRefreshTask: Task<Void, Never>?
-    private var authorizationPollingTask: Task<Void, Never>?
-    private var isFirstTicketLoad = true
     private var isTicketRefreshing = false
+    private var isFirstTicketLoad = true
+    private var wsHandlersSetup = false
 
     init() {
         loadConfig()
         loadDeviceId()
-        setupWebSocketHandlers()
     }
 
     // MARK: - Config
@@ -79,9 +80,213 @@ final class AppViewModel: ObservableObject {
         self.apiUrl = ""
         self.wsUrl = ""
         self.isConfigured = false
+        self.room = nil
+        self.authorized = false
+        self.queue = []
+        self.currentItem = nil
+        WebSocketService.shared.disconnect()
+        stopJoinTicketRefresh()
     }
 
-    // MARK: - QR Code
+    // MARK: - Device ID
+    private func loadDeviceId() {
+        if let id = UserDefaults.standard.string(forKey: "nasktv_device_id"), !id.isEmpty {
+            self.deviceId = id
+        } else {
+            self.deviceId = UUID().uuidString
+            UserDefaults.standard.set(self.deviceId, forKey: "nasktv_device_id")
+        }
+    }
+
+    func clearDeviceId() {
+        UserDefaults.standard.removeObject(forKey: "nasktv_device_id")
+        self.deviceId = UUID().uuidString
+        UserDefaults.standard.set(self.deviceId, forKey: "nasktv_device_id")
+    }
+
+    // MARK: - Bootstrap (参考安卓端 App.tsx)
+    func bootstrap() async {
+        guard isConfigured, !isRegistering else { return }
+        isRegistering = true
+        bootstrapError = nil
+
+        do {
+            // 1. 健康检查
+            let _ = try await APIService.shared.healthCheck()
+
+            // 2. 验证缓存的 roomCode 是否仍存在
+            if let storedCode = UserDefaults.standard.string(forKey: "nasktv_room_code") {
+                do {
+                    let _ = try await APIService.shared.getRoom(code: storedCode)
+                } catch {
+                    if case APIError.httpError(let code) = error, code == 404 {
+                        clearDeviceId()
+                    }
+                }
+            }
+
+            // 3. 注册设备
+            let deviceInfo = "tvOS \(UIDevice.current.model)"
+            var roomData = try await APIService.shared.registerDevice(
+                deviceId: deviceId,
+                name: "Apple TV",
+                deviceInfo: deviceInfo
+            )
+
+            // 4. 启动时轮换一次房间码（参考安卓端 sessionStorage 逻辑）
+            let hasRotated = UserDefaults.standard.bool(forKey: "nasktv_code_rotated")
+            if !hasRotated {
+                do {
+                    roomData = try await APIService.shared.rotateCode(roomData.id, deviceId: deviceId)
+                    UserDefaults.standard.set(true, forKey: "nasktv_code_rotated")
+                } catch {
+                    print("Rotate code failed: \(error)")
+                }
+            }
+
+            // 5. 设置 room（触发 WebSocket 连接）
+            await MainActor.run {
+                setRoom(roomData)
+                UserDefaults.standard.set(roomData.code, forKey: "nasktv_room_code")
+                self.isRegistering = false
+            }
+
+            // 6. 加载 H5 URL
+            await loadH5Url()
+
+        } catch {
+            await MainActor.run {
+                self.bootstrapError = error.localizedDescription
+                self.isRegistering = false
+            }
+        }
+    }
+
+    private func setRoom(_ room: Room) {
+        self.room = room
+        self.authorized = room.isAuthorized
+        // 无论授权状态都连接 WebSocket（参考安卓端 useRoomSync）
+        setupWebSocketHandlersIfNeeded()
+        WebSocketService.shared.connect(roomCode: room.code, deviceId: room.deviceId)
+    }
+
+    // MARK: - WebSocket Handlers (参考安卓端 useRoomSync.ts)
+    private func setupWebSocketHandlersIfNeeded() {
+        guard !wsHandlersSetup else { return }
+        wsHandlersSetup = true
+
+        WebSocketService.shared.onStatusChange { [weak self] status in
+            DispatchQueue.main.async {
+                self?.wsStatus = status
+            }
+        }
+
+        // ROOM_STATE_SNAPSHOT
+        WebSocketService.shared.on(.ROOM_STATE_SNAPSHOT) { [weak self] message in
+            guard let self = self else { return }
+            DispatchQueue.main.async {
+                if let snapshot = message.decodePayload(RoomStateSnapshotPayload.self) {
+                    if let version = snapshot.queueVersion {
+                        self.lastQueueVersion = version
+                    }
+                    self.queue = snapshot.queue
+                    self.currentItem = snapshot.queue.first { $0.isPlaying }
+                    self.authorized = snapshot.authorized
+                    self.playerState = snapshot.playerState
+                    if snapshot.authorized {
+                        self.loadH5Url()
+                        self.startJoinTicketRefresh()
+                    } else {
+                        self.stopJoinTicketRefresh()
+                        self.joinTicket = nil
+                    }
+                }
+            }
+        }
+
+        // QUEUE_UPDATED
+        WebSocketService.shared.on(.QUEUE_UPDATED) { [weak self] message in
+            guard let self = self else { return }
+            DispatchQueue.main.async {
+                if let updated = message.decodePayload(QueueUpdatedPayload.self) {
+                    if let version = updated.queueVersion, version < self.lastQueueVersion {
+                        return
+                    }
+                    if let version = updated.queueVersion {
+                        self.lastQueueVersion = max(self.lastQueueVersion, version)
+                    }
+                    self.queue = updated.queue
+                    self.currentItem = updated.queue.first { $0.isPlaying }
+                }
+            }
+        }
+
+        // PLAYER_STATE_UPDATED
+        WebSocketService.shared.on(.PLAYER_STATE_UPDATED) { [weak self] message in
+            DispatchQueue.main.async {
+                if let state = message.decodePayload(PlayerStatePayload.self) {
+                    self?.playerState = state
+                }
+            }
+        }
+
+        // ROOM_AUTHORIZED
+        WebSocketService.shared.on(.ROOM_AUTHORIZED) { [weak self] _ in
+            DispatchQueue.main.async {
+                self?.authorized = true
+                self?.expiresAt = nil
+                self?.loadH5Url()
+                self?.startJoinTicketRefresh()
+            }
+        }
+
+        // ROOM_EXPIRING_SOON
+        WebSocketService.shared.on(.ROOM_EXPIRING_SOON) { [weak self] message in
+            guard let payload = message.payload else { return }
+            DispatchQueue.main.async {
+                if let expiresAt = payload["expiresAt"]?.value as? String {
+                    self?.expiresAt = expiresAt
+                }
+            }
+        }
+
+        // ROOM_UNAUTHORIZED
+        WebSocketService.shared.on(.ROOM_UNAUTHORIZED) { [weak self] _ in
+            DispatchQueue.main.async {
+                self?.authorized = false
+                self?.expiresAt = nil
+                self?.stopJoinTicketRefresh()
+                self?.joinTicket = nil
+            }
+        }
+
+        // ROOM_CLOSED (设备被删除)
+        WebSocketService.shared.on(.ROOM_CLOSED) { [weak self] message in
+            guard let self = self, let payload = message.payload else { return }
+            if let reason = payload["reason"]?.value as? String, reason == "deleted" {
+                DispatchQueue.main.async {
+                    self.isDeleting = true
+                    WebSocketService.shared.disconnect()
+                    self.clearDeviceId()
+                    self.resetRoom()
+                    self.isDeleting = false
+                }
+            }
+        }
+    }
+
+    private func resetRoom() {
+        room = nil
+        authorized = false
+        expiresAt = nil
+        queue = []
+        currentItem = nil
+        playerState = nil
+        joinTicket = nil
+        UserDefaults.standard.removeObject(forKey: "nasktv_room_code")
+    }
+
+    // MARK: - QR Code / Join Ticket (参考安卓端 useJoinTicket.ts)
     var qrText: String {
         guard !h5BaseUrl.isEmpty, let ticket = joinTicket else { return "" }
         let base = h5BaseUrl.replacingOccurrences(of: "/+$", with: "", options: .regularExpression)
@@ -120,7 +325,7 @@ final class AppViewModel: ObservableObject {
             guard let self = self else { return }
             defer { self.isTicketRefreshing = false }
             while !Task.isCancelled {
-                guard let room = self.room, room.isAuthorized else {
+                guard let room = self.room, room.isAuthorized || self.authorized else {
                     try? await Task.sleep(nanoseconds: 5_000_000_000)
                     continue
                 }
@@ -149,38 +354,59 @@ final class AppViewModel: ObservableObject {
         ticketRefreshTask = nil
     }
 
-    // MARK: - Authorization Polling
-    func startAuthorizationPolling() {
-        stopAuthorizationPolling()
-        authorizationPollingTask = Task { [weak self] in
-            while !Task.isCancelled {
-                guard let self = self, let room = self.room else {
-                    try? await Task.sleep(nanoseconds: 5_000_000_000)
-                    continue
-                }
-                do {
-                    let updated = try await APIService.shared.getRoom(code: room.code)
-                    if let updated = updated, updated.isAuthorized {
-                        await MainActor.run {
-                            self.room = updated
-                            self.authorized = true
-                            self.connectWebSocket()
-                            self.loadH5Url()
-                            self.startJoinTicketRefresh()
-                        }
-                        return
-                    }
-                } catch {
-                    print("Authorization polling error: \(error)")
-                }
-                try? await Task.sleep(nanoseconds: 5_000_000_000)
+    // MARK: - Lyrics
+    func loadLyrics(songId: Int) async {
+        do {
+            let lines = try await APIService.shared.getLyrics(songId: songId)
+            await MainActor.run {
+                self.lyrics = lines
+                self.currentLyricIndex = 0
+            }
+        } catch {
+            print("Lyrics load error: \(error)")
+        }
+    }
+
+    func updateCurrentLyric(time: Double) {
+        guard !lyrics.isEmpty else { return }
+        var newIndex = 0
+        for (i, line) in lyrics.enumerated() {
+            if line.time <= time {
+                newIndex = i
+            } else {
+                break
+            }
+        }
+        if newIndex != currentLyricIndex {
+            currentLyricIndex = newIndex
+        }
+    }
+
+    // MARK: - Player Control
+    func sendPlayPause() {
+        // WebSocket 通知服务端
+    }
+
+    func sendNext() {
+        guard let room = room, let item = currentItem else { return }
+        Task {
+            do {
+                try await APIService.shared.skipSong(roomId: room.id, deviceId: room.deviceId, queueItemId: item.id)
+            } catch {
+                print("Skip error: \(error)")
             }
         }
     }
 
-    func stopAuthorizationPolling() {
-        authorizationPollingTask?.cancel()
-        authorizationPollingTask = nil
+    func sendPrev() {
+        guard let room = room, let item = currentItem else { return }
+        Task {
+            do {
+                try await APIService.shared.completeSong(roomId: room.id, deviceId: room.deviceId, queueItemId: item.id)
+            } catch {
+                print("Complete error: \(error)")
+            }
+        }
     }
 
     // MARK: - App Lifecycle
@@ -188,13 +414,14 @@ final class AppViewModel: ObservableObject {
         Task {
             if isConfigured {
                 if room == nil {
-                    await registerDevice()
-                } else if authorized {
-                    connectWebSocket()
-                    loadH5Url()
-                    startJoinTicketRefresh()
+                    await bootstrap()
                 } else {
-                    startAuthorizationPolling()
+                    setupWebSocketHandlersIfNeeded()
+                    WebSocketService.shared.connect(roomCode: room!.code, deviceId: room!.deviceId)
+                    if authorized {
+                        loadH5Url()
+                        startJoinTicketRefresh()
+                    }
                 }
             }
         }
@@ -202,233 +429,7 @@ final class AppViewModel: ObservableObject {
 
     func handleAppBackground() {
         stopJoinTicketRefresh()
-        stopAuthorizationPolling()
         WebSocketService.shared.disconnect()
         wsStatus = .disconnected
     }
-
-    // MARK: - Device ID
-    private func loadDeviceId() {
-        if let id = UserDefaults.standard.string(forKey: "nasktv_device_id"), !id.isEmpty {
-            self.deviceId = id
-        } else {
-            self.deviceId = UUID().uuidString
-            UserDefaults.standard.set(self.deviceId, forKey: "nasktv_device_id")
-        }
-    }
-
-    func clearDeviceId() {
-        UserDefaults.standard.removeObject(forKey: "nasktv_device_id")
-        self.deviceId = UUID().uuidString
-        UserDefaults.standard.set(self.deviceId, forKey: "nasktv_device_id")
-    }
-
-    // MARK: - Registration
-    func registerDevice() async {
-        guard isConfigured, !isRegistering else { return }
-        isRegistering = true
-        errorMessage = nil
-        do {
-            let deviceInfo = "tvOS/iOS \(UIDevice.current.model)"
-            let room = try await APIService.shared.registerDevice(
-                deviceId: deviceId,
-                name: "Apple TV",
-                deviceInfo: deviceInfo
-            )
-            await MainActor.run {
-                self.room = room
-                self.authorized = room.isAuthorized
-                self.isRegistering = false
-                // 无论是否授权都连接 WebSocket，通过 ROOM_STATE_SNAPSHOT 获取最新授权状态
-                connectWebSocket()
-                // 提前加载 H5 URL
-                loadH5Url()
-            }
-        } catch {
-            await MainActor.run {
-                self.errorMessage = error.localizedDescription
-                self.isRegistering = false
-            }
-        }
-    }
-
-    // MARK: - WebSocket
-    private func connectWebSocket() {
-        guard let room = room else { return }
-        WebSocketService.shared.connect(roomCode: room.code, deviceId: room.deviceId)
-    }
-
-    private func setupWebSocketHandlers() {
-        WebSocketService.shared.onStatusChange { [weak self] status in
-            DispatchQueue.main.async {
-                self?.wsStatus = status
-            }
-        }
-
-        // Room state snapshot
-        WebSocketService.shared.on(.ROOM_STATE_SNAPSHOT) { [weak self] message in
-            guard let self = self else { return }
-            DispatchQueue.main.async {
-                if let snapshot = message.decodePayload(RoomStateSnapshotPayload.self) {
-                    if let version = snapshot.queueVersion {
-                        self.lastQueueVersion = version
-                    }
-                    self.queue = snapshot.queue
-                    self.currentItem = snapshot.queue.first { $0.isPlaying }
-                    self.authorized = snapshot.authorized
-                    self.playerState = snapshot.playerState
-                    if snapshot.authorized {
-                        self.loadH5Url()
-                        self.startJoinTicketRefresh()
-                    } else {
-                        self.stopJoinTicketRefresh()
-                        self.joinTicket = nil
-                    }
-                }
-            }
-        }
-
-        // Queue updated
-        WebSocketService.shared.on(.QUEUE_UPDATED) { [weak self] message in
-            guard let self = self else { return }
-            DispatchQueue.main.async {
-                if let updated = message.decodePayload(QueueUpdatedPayload.self) {
-                    if let version = updated.queueVersion, version < self.lastQueueVersion {
-                        return
-                    }
-                    if let version = updated.queueVersion {
-                        self.lastQueueVersion = max(self.lastQueueVersion, version)
-                    }
-                    self.queue = updated.queue
-                    self.currentItem = updated.queue.first { $0.isPlaying }
-                }
-            }
-        }
-
-        // Player state updated
-        WebSocketService.shared.on(.PLAYER_STATE_UPDATED) { [weak self] message in
-            DispatchQueue.main.async {
-                if let state = message.decodePayload(PlayerStatePayload.self) {
-                    self?.playerState = state
-                }
-            }
-        }
-
-        // Authorized
-        WebSocketService.shared.on(.ROOM_AUTHORIZED) { [weak self] _ in
-            DispatchQueue.main.async {
-                self?.authorized = true
-                self?.expiresAt = nil
-                self?.loadH5Url()
-                self?.startJoinTicketRefresh()
-            }
-        }
-
-        // Expiring soon
-        WebSocketService.shared.on(.ROOM_EXPIRING_SOON) { [weak self] message in
-            guard let payload = message.payload else { return }
-            DispatchQueue.main.async {
-                if let expiresAt = payload["expiresAt"]?.value as? String {
-                    self?.expiresAt = expiresAt
-                }
-            }
-        }
-
-        // Unauthorized
-        WebSocketService.shared.on(.ROOM_UNAUTHORIZED) { [weak self] _ in
-            DispatchQueue.main.async {
-                self?.authorized = false
-                self?.expiresAt = nil
-                self?.stopJoinTicketRefresh()
-                self?.joinTicket = nil
-            }
-        }
-
-        // Room closed (device deleted)
-        WebSocketService.shared.on(.ROOM_CLOSED) { [weak self] message in
-            guard let self = self, let payload = message.payload else { return }
-            if let reason = payload["reason"]?.value as? String, reason == "deleted" {
-                DispatchQueue.main.async {
-                    self.isDeleting = true
-                    WebSocketService.shared.disconnect()
-                    self.clearDeviceId()
-                    self.resetRoom()
-                    self.isDeleting = false
-                }
-            }
-        }
-    }
-
-    private func resetRoom() {
-        room = nil
-        authorized = false
-        expiresAt = nil
-        queue = []
-        currentItem = nil
-        playerState = nil
-    }
-
-    // MARK: - Lyrics
-    func loadLyrics(songId: Int) async {
-        do {
-            let lines = try await APIService.shared.getLyrics(songId: songId)
-            await MainActor.run {
-                self.lyrics = lines
-            }
-        } catch {
-            await MainActor.run {
-                self.lyrics = []
-            }
-        }
-    }
-
-    func updateCurrentLyric(time: Double) {
-        guard !lyrics.isEmpty else { return }
-        var index = 0
-        for (i, line) in lyrics.enumerated() {
-            if line.time <= time {
-                index = i
-            } else {
-                break
-            }
-        }
-        if index != currentLyricIndex {
-            currentLyricIndex = index
-        }
-    }
-
-    // MARK: - Player Control (send to backend via WS)
-    func sendPlayPause() {
-        let message = WsMessage(
-            type: .PLAYER_STATE_UPDATED,
-            payload: ["action": AnyCodable("play_pause")],
-            timestamp: Int64(Date().timeIntervalSince1970 * 1000)
-        )
-        WebSocketService.shared.send(message)
-    }
-
-    func sendNext() {
-        let message = WsMessage(
-            type: .PLAYER_STATE_UPDATED,
-            payload: ["action": AnyCodable("next")],
-            timestamp: Int64(Date().timeIntervalSince1970 * 1000)
-        )
-        WebSocketService.shared.send(message)
-    }
-
-    func sendPrev() {
-        let message = WsMessage(
-            type: .PLAYER_STATE_UPDATED,
-            payload: ["action": AnyCodable("prev")],
-            timestamp: Int64(Date().timeIntervalSince1970 * 1000)
-        )
-        WebSocketService.shared.send(message)
-    }
 }
-
-// MARK: - UIDevice helper (for tvOS/iOS compatibility)
-#if os(tvOS)
-import UIKit
-#elseif os(iOS)
-import UIKit
-#endif
