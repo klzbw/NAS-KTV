@@ -49,7 +49,7 @@ struct BootstrapView: View {
 
                         Text(room.deviceId)
                             .font(.caption2)
-                            .foregroundColor(.tertiary)
+                            .foregroundColor(.secondary)
                             .lineLimit(1)
                             .minimumScaleFactor(0.5)
                     }

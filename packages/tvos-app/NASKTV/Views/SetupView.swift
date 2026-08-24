@@ -35,7 +35,6 @@ struct SetupView: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                     TextField("http://192.168.3.16:3000", text: $apiUrlInput)
-                        .textFieldStyle(.roundedBorder)
                         .autocapitalization(.none)
                         .disableAutocorrection(true)
                 }
@@ -45,7 +44,6 @@ struct SetupView: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                     TextField("ws://192.168.3.16:3000", text: $wsUrlInput)
-                        .textFieldStyle(.roundedBorder)
                         .autocapitalization(.none)
                         .disableAutocorrection(true)
                 }

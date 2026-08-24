@@ -11,13 +11,13 @@ struct QueueView: View {
                     VStack(spacing: 20) {
                         Image(systemName: "list.bullet")
                             .font(.system(size: 60))
-                            .foregroundColor(.tertiary)
+                            .foregroundColor(.secondary)
                         Text("队列为空")
                             .font(.title)
                             .foregroundColor(.secondary)
                         Text("使用手机扫码点歌")
                             .font(.subheadline)
-                            .foregroundColor(.tertiary)
+                            .foregroundColor(.secondary)
                     }
                 } else {
                     List {

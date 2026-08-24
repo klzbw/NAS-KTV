@@ -35,7 +35,7 @@ struct NowPlayingView: View {
                         VStack(spacing: 16) {
                             Image(systemName: "music.note")
                                 .font(.system(size: 60))
-                                .foregroundColor(.tertiary)
+                                .foregroundColor(.secondary)
                             Text("暂无歌词")
                                 .foregroundColor(.secondary)
                         }
@@ -101,13 +101,13 @@ struct NowPlayingView: View {
                     VStack(spacing: 20) {
                         Image(systemName: "music.note.tv")
                             .font(.system(size: 80))
-                            .foregroundColor(.tertiary)
+                            .foregroundColor(.secondary)
                         Text("暂无播放")
                             .font(.title)
                             .foregroundColor(.secondary)
                         Text("使用手机扫码点歌，或在队列中选择歌曲")
                             .font(.subheadline)
-                            .foregroundColor(.tertiary)
+                            .foregroundColor(.secondary)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
