@@ -26,7 +26,7 @@ struct NASKTVApp: App {
                     Task { await viewModel.registerDevice() }
                 }
             }
-            .onChange(of: scenePhase) { _, newPhase in
+            .onChange(of: scenePhase) { newPhase in
                 switch newPhase {
                 case .active:
                     viewModel.handleAppForeground()
