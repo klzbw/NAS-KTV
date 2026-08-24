@@ -113,14 +113,7 @@ struct NowPlayingView: View {
                 }
             }
             .navigationTitle("正在播放")
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: { showLyrics.toggle() }) {
-                        Image(systemName: showLyrics ? "text.bubble.fill" : "text.bubble")
-                    }
-                }
-            }
-            .onChange(of: viewModel.currentItem?.songId) { _, newId in
+            .onChange(of: viewModel.currentItem?.songId) { newId in
                 if let id = newId {
                     Task { await viewModel.loadLyrics(songId: id) }
                 }

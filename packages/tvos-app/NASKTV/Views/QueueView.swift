@@ -69,13 +69,7 @@ struct QueueView: View {
                     .listStyle(.plain)
                 }
             }
-            .navigationTitle("播放队列")
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Text("\(viewModel.queue.count) 首")
-                        .foregroundColor(.secondary)
-                }
-            }
+            .navigationTitle("播放队列（\(viewModel.queue.count) 首）")
         }
     }
 }
