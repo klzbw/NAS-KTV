@@ -199,6 +199,62 @@ docker compose logs -f downloader
 
 ---
 
+### 3.8 部署前检查清单（.env 必填项）
+
+`docker compose` 启动前必须先准备根目录 `.env`（复制模板：`cp .env.example .env`）。
+下面按「不填会出问题的程度」分级，**★ 为硬必填**。
+
+#### 🔴 硬必填（不填有安全风险 / 功能异常）
+
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| ★ `JWT_SECRET` | `your-jwt-secret-change-me` | JWT 签名密钥，上线必须用随机串替换：`openssl rand -hex 32` |
+| ★ `ADMIN_PASSWORD` | `admin123` | 管理员密码，必须改成强密码 |
+| `ADMIN_USERNAME` | `admin` | 管理员账号（可改可不改） |
+
+#### 🟡 按需必填（启用对应功能时才需填）
+
+| 变量 | 默认 | 触发条件 | 说明 |
+|------|------|---------|------|
+| `AI_API_KEY` | 空 | `AI_ENABLED=true` | 启用 AI 解析时必填，否则 AI 功能报错 |
+| `AI_BASE_URL` | `https://api.openai.com/v1` | 用非 OpenAI 服务商 | DeepSeek / 通义 / Moonshot / Ollama 需改 |
+| `ENABLED_SOURCES` | 空（全启用） | 想限定下载源 | 留空启用全部 7 源：`qq,kugou,kuwo,netease,soda,fivesing,bodian` |
+
+#### 🟢 通常不用改（compose 已自动注入容器内正确值）
+
+以下变量在 `docker-compose.yml` 的 `environment` 中已写好容器内路径 / 地址，
+`.env` 里即使保留本地开发值也会被覆盖，部署时无需处理：
+
+- `PORT` / `NODE_ENV` / `DB_PATH` / `SCAN_PATH`
+- `SEPARATOR_SERVICE_URL` / `SEPARATION_OUTPUT_DIR`
+- `DOWNLOADER_SERVICE_URL`
+- `HF_ENDPOINT`（容器内已设 `hf-mirror.com`）、`FFMPEG_PATH`（容器内已预装）
+
+#### ✅ 部署前勾选清单
+
+```bash
+# 1. 复制并填写环境变量
+cp .env.example .env
+#   - JWT_SECRET 改成 openssl rand -hex 32 生成的随机串
+#   - ADMIN_PASSWORD 改成强密码
+#   - （如需 AI）AI_ENABLED=true 且 AI_API_KEY 已填
+#   - （如需限定源）ENABLED_SOURCES 已设
+
+# 2. 创建数据目录
+mkdir -p data/{db,songs,separation,uploads,separator-cache,downloader-cache}
+
+# 3. 构建并启动
+docker compose up -d --build
+
+# 4. 确认 4 个服务 healthy
+docker compose ps
+
+# 5. 浏览器访问后台验证登录
+#    http://NAS_IP:8080/admin/
+```
+
+---
+
 ## 四、常用运维命令
 
 ```bash
