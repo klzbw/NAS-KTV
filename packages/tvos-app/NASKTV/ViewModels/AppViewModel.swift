@@ -137,7 +137,7 @@ final class AppViewModel: ObservableObject {
             let hasRotated = UserDefaults.standard.bool(forKey: "nasktv_code_rotated")
             if !hasRotated {
                 do {
-                    roomData = try await APIService.shared.rotateCode(roomData.id, deviceId: deviceId)
+                    roomData = try await APIService.shared.rotateCode(roomId: roomData.id, deviceId: deviceId)
                     UserDefaults.standard.set(true, forKey: "nasktv_code_rotated")
                 } catch {
                     print("Rotate code failed: \(error)")
