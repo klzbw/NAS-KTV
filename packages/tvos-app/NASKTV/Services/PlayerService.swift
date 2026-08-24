@@ -22,7 +22,7 @@ final class PlayerService: NSObject, ObservableObject {
     private var timeObserver: Any?
     private var currentURL: URL?
 
-    private init() {
+    private override init() {
         setupAudioSession()
     }
 
