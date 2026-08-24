@@ -23,6 +23,7 @@ final class PlayerService: NSObject, ObservableObject {
     private var currentURL: URL?
 
     private override init() {
+        super.init()
         setupAudioSession()
     }
 
