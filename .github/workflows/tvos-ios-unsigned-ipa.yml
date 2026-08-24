@@ -79,13 +79,6 @@ jobs:
           BUILD_EXIT=${PIPESTATUS[0]}
           echo "=== Build exit code: $BUILD_EXIT ==="
 
-          # Ensure Info.plist in .app
-          APP_PATH="build/Build/Products/${{ env.CONFIGURATION }}-appletvos/NASKTV.app"
-          if [ -d "$APP_PATH" ] && [ -f "NASKTV/Info.plist" ]; then
-            cp NASKTV/Info.plist "$APP_PATH/Info.plist"
-            echo "Info.plist copied"
-          fi
-
           if [ $BUILD_EXIT -ne 0 ]; then
             echo "=== Build failed, last 200 lines ==="
             tail -200 build-tvos.log
@@ -180,11 +173,6 @@ jobs:
             build 2>&1 | tee build-ios.log
           BUILD_EXIT=${PIPESTATUS[0]}
           echo "=== Build exit code: $BUILD_EXIT ==="
-
-          APP_PATH="build-ios/Build/Products/${{ env.CONFIGURATION }}-iphoneos/NASKTV.app"
-          if [ -d "$APP_PATH" ] && [ -f "NASKTV/Info.plist" ]; then
-            cp NASKTV/Info.plist "$APP_PATH/Info.plist"
-          fi
 
           if [ $BUILD_EXIT -ne 0 ]; then
             echo "=== Build failed, last 200 lines ==="
