@@ -1,0 +1,233 @@
+name: tvOS/iOS Unsigned IPA Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      configuration:
+        description: 'Build configuration'
+        required: true
+        default: 'Release'
+        type: choice
+        options:
+          - Debug
+          - Release
+      platform:
+        description: 'Target platform'
+        required: true
+        default: 'both'
+        type: choice
+        options:
+          - tvos
+          - ios
+          - both
+  push:
+    paths:
+      - 'packages/tvos-app/**'
+      - '.github/workflows/tvos-ios-unsigned-ipa.yml'
+
+env:
+  PROJECT_PATH: packages/tvos-app
+  SCHEME: NASKTV
+  CONFIGURATION: ${{ github.event.inputs.configuration || 'Release' }}
+
+jobs:
+  build-tvos:
+    name: Build tvOS Unsigned IPA
+    runs-on: macos-14
+    timeout-minutes: 30
+    if: ${{ github.event.inputs.platform == 'tvos' || github.event.inputs.platform == 'both' || github.event_name == 'push' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select latest Xcode
+        run: |
+          LATEST_XCODE=$(ls -d /Applications/Xcode*.app 2>/dev/null | sort -V | tail -1)
+          if [ -n "$LATEST_XCODE" ]; then
+            echo "Selecting Xcode: $LATEST_XCODE"
+            sudo xcode-select -s "$LATEST_XCODE/Contents/Developer"
+          fi
+          xcodebuild -version
+          echo "=== tvOS SDKs ==="
+          xcodebuild -showsdks | grep -i tvos
+
+      - name: Verify project
+        run: |
+          cd ${{ env.PROJECT_PATH }}
+          xcodebuild -list -project NASKTV.xcodeproj 2>&1 || true
+          echo "=== Source files ==="
+          find NASKTV -name "*.swift" | sort
+
+      - name: Build for tvOS Device (Unsigned)
+        run: |
+          cd ${{ env.PROJECT_PATH }}
+          echo "=== Starting unsigned tvOS device build ==="
+          xcodebuild \
+            -project NASKTV.xcodeproj \
+            -scheme NASKTV \
+            -configuration "${{ env.CONFIGURATION }}" \
+            -sdk appletvos \
+            -destination 'generic/platform=tvOS' \
+            -derivedDataPath build \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_ENTITLEMENTS="" \
+            VALIDATE_PRODUCT=NO \
+            build 2>&1 | tee build-tvos.log
+          BUILD_EXIT=${PIPESTATUS[0]}
+          echo "=== Build exit code: $BUILD_EXIT ==="
+
+          # Ensure Info.plist in .app
+          APP_PATH="build/Build/Products/${{ env.CONFIGURATION }}-appletvos/NASKTV.app"
+          if [ -d "$APP_PATH" ] && [ -f "NASKTV/Info.plist" ]; then
+            cp NASKTV/Info.plist "$APP_PATH/Info.plist"
+            echo "Info.plist copied"
+          fi
+
+          if [ $BUILD_EXIT -ne 0 ]; then
+            echo "=== Build failed, last 200 lines ==="
+            tail -200 build-tvos.log
+            exit $BUILD_EXIT
+          fi
+
+      - name: Package tvOS Unsigned IPA
+        run: |
+          cd ${{ env.PROJECT_PATH }}
+          APP_PATH=$(find build/Build/Products -name "NASKTV.app" -type d -path "*appletvos*" | head -1)
+          echo "App path: $APP_PATH"
+
+          if [ -z "$APP_PATH" ] || [ ! -d "$APP_PATH" ]; then
+            echo "ERROR: NASKTV.app not found"
+            find build -name "*.app" -type d 2>/dev/null || true
+            exit 1
+          fi
+
+          mkdir -p build/ipa-tvos/Payload
+          cp -R "$APP_PATH" build/ipa-tvos/Payload/
+
+          # Remove code signature
+          rm -rf build/ipa-tvos/Payload/NASKTV.app/_CodeSignature
+          rm -f build/ipa-tvos/Payload/NASKTV.app/embedded.mobileprovision
+
+          cd build/ipa-tvos
+          IPA_NAME="NASKTV-tvOS-unsigned-${{ env.CONFIGURATION }}.ipa"
+          zip -r "../$IPA_NAME" Payload
+          echo "=== tvOS IPA created: $IPA_NAME ==="
+          ls -la "../$IPA_NAME"
+          echo "=== IPA contents (top 20) ==="
+          unzip -l "../$IPA_NAME" | head -20
+
+      - name: Upload tvOS IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: NASKTV-tvOS-unsigned-ipa
+          path: packages/tvos-app/build/NASKTV-tvOS-unsigned-*.ipa
+          retention-days: 90
+          if-no-files-found: error
+
+      - name: Upload tvOS build logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tvos-build-logs
+          path: packages/tvos-app/build-tvos.log
+          retention-days: 30
+          if-no-files-found: ignore
+
+  build-ios:
+    name: Build iOS Unsigned IPA
+    runs-on: macos-14
+    timeout-minutes: 30
+    if: ${{ github.event.inputs.platform == 'ios' || github.event.inputs.platform == 'both' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select latest Xcode
+        run: |
+          LATEST_XCODE=$(ls -d /Applications/Xcode*.app 2>/dev/null | sort -V | tail -1)
+          if [ -n "$LATEST_XCODE" ]; then
+            sudo xcode-select -s "$LATEST_XCODE/Contents/Developer"
+          fi
+          xcodebuild -version
+          echo "=== iOS SDKs ==="
+          xcodebuild -showsdks | grep -i iphone
+
+      - name: Verify project
+        run: |
+          cd ${{ env.PROJECT_PATH }}
+          xcodebuild -list -project NASKTV.xcodeproj 2>&1 || true
+
+      - name: Build for iOS Device (Unsigned)
+        run: |
+          cd ${{ env.PROJECT_PATH }}
+          echo "=== Starting unsigned iOS device build ==="
+          xcodebuild \
+            -project NASKTV.xcodeproj \
+            -scheme NASKTV \
+            -configuration "${{ env.CONFIGURATION }}" \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build-ios \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_ENTITLEMENTS="" \
+            VALIDATE_PRODUCT=NO \
+            build 2>&1 | tee build-ios.log
+          BUILD_EXIT=${PIPESTATUS[0]}
+          echo "=== Build exit code: $BUILD_EXIT ==="
+
+          APP_PATH="build-ios/Build/Products/${{ env.CONFIGURATION }}-iphoneos/NASKTV.app"
+          if [ -d "$APP_PATH" ] && [ -f "NASKTV/Info.plist" ]; then
+            cp NASKTV/Info.plist "$APP_PATH/Info.plist"
+          fi
+
+          if [ $BUILD_EXIT -ne 0 ]; then
+            echo "=== Build failed, last 200 lines ==="
+            tail -200 build-ios.log
+            exit $BUILD_EXIT
+          fi
+
+      - name: Package iOS Unsigned IPA
+        run: |
+          cd ${{ env.PROJECT_PATH }}
+          APP_PATH=$(find build-ios/Build/Products -name "NASKTV.app" -type d | head -1)
+          echo "App path: $APP_PATH"
+
+          if [ -z "$APP_PATH" ] || [ ! -d "$APP_PATH" ]; then
+            echo "ERROR: NASKTV.app not found"
+            find build-ios -name "*.app" -type d 2>/dev/null || true
+            exit 1
+          fi
+
+          mkdir -p build/ipa-ios/Payload
+          cp -R "$APP_PATH" build/ipa-ios/Payload/
+          rm -rf build/ipa-ios/Payload/NASKTV.app/_CodeSignature
+          rm -f build/ipa-ios/Payload/NASKTV.app/embedded.mobileprovision
+
+          cd build/ipa-ios
+          IPA_NAME="NASKTV-iOS-unsigned-${{ env.CONFIGURATION }}.ipa"
+          zip -r "../$IPA_NAME" Payload
+          echo "=== iOS IPA created: $IPA_NAME ==="
+          ls -la "../$IPA_NAME"
+
+      - name: Upload iOS IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: NASKTV-iOS-unsigned-ipa
+          path: packages/tvos-app/build/NASKTV-iOS-unsigned-*.ipa
+          retention-days: 90
+          if-no-files-found: error
+
+      - name: Upload iOS build logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-build-logs
+          path: packages/tvos-app/build-ios.log
+          retention-days: 30
+          if-no-files-found: ignore
