@@ -9,7 +9,7 @@ enum TrackType: String {
 }
 
 // MARK: - PlayerService
-final class PlayerService: ObservableObject {
+final class PlayerService: NSObject, ObservableObject {
     static let shared = PlayerService()
 
     @Published private(set) var isPlaying = false

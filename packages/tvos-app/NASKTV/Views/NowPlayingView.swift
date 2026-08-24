@@ -113,7 +113,6 @@ struct NowPlayingView: View {
                 }
             }
             .navigationTitle("正在播放")
-            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: { showLyrics.toggle() }) {
