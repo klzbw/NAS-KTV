@@ -239,9 +239,10 @@ final class AppViewModel: ObservableObject {
                 self.room = room
                 self.authorized = room.isAuthorized
                 self.isRegistering = false
-                if room.isAuthorized {
-                    connectWebSocket()
-                }
+                // 无论是否授权都连接 WebSocket，通过 ROOM_STATE_SNAPSHOT 获取最新授权状态
+                connectWebSocket()
+                // 提前加载 H5 URL
+                loadH5Url()
             }
         } catch {
             await MainActor.run {

@@ -52,6 +52,13 @@ final class APIService {
         return data
     }
 
+    func rotateCode(roomId: Int, deviceId: String) async throws -> Room {
+        let body: [String: Any] = ["deviceId": deviceId]
+        let response: APIResponse<Room> = try await post("/rooms/\(roomId)/rotate-code", body: body)
+        guard let data = response.data else { throw APIError.noData }
+        return data
+    }
+
     func getQRCodeURL(data: String) -> URL? {
         let encoded = data.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? data
         return URL(string: "\(baseURL)/rooms/qrcode?data=\(encoded)")
