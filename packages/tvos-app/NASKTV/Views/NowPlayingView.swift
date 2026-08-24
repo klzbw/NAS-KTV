@@ -182,7 +182,7 @@ struct LyricsView: View {
                 }
                 .padding(.vertical, 100)
             }
-            .onChange(of: viewModel.currentLyricIndex) { _, newIndex in
+            .onChange(of: viewModel.currentLyricIndex) { newIndex in
                 withAnimation {
                     proxy.scrollTo(newIndex, anchor: .center)
                 }
