@@ -126,7 +126,7 @@ final class AppViewModel: ObservableObject {
             }
 
             // 3. 注册设备
-            let deviceInfo = "tvOS \(UIDevice.current.model)"
+            let deviceInfo = "tvOS Apple TV"
             var roomData = try await APIService.shared.registerDevice(
                 deviceId: deviceId,
                 name: "Apple TV",
@@ -145,14 +145,15 @@ final class AppViewModel: ObservableObject {
             }
 
             // 5. 设置 room（触发 WebSocket 连接）
+            let finalRoom = roomData
             await MainActor.run {
-                setRoom(roomData)
-                UserDefaults.standard.set(roomData.code, forKey: "nasktv_room_code")
+                setRoom(finalRoom)
+                UserDefaults.standard.set(finalRoom.code, forKey: "nasktv_room_code")
                 self.isRegistering = false
             }
 
             // 6. 加载 H5 URL
-            await loadH5Url()
+            loadH5Url()
 
         } catch {
             await MainActor.run {

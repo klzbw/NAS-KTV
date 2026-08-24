@@ -35,7 +35,10 @@ struct SetupView: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                     TextField("http://192.168.1.100:3000/api", text: $apiUrlInput)
-                        .textFieldStyle(.roundedBorder)
+                        .textFieldStyle(.plain)
+                        .padding(10)
+                        .background(Color.secondary.opacity(0.1))
+                        .cornerRadius(8)
                         .autocapitalization(.none)
                         .disableAutocorrection(true)
                 }
@@ -45,7 +48,10 @@ struct SetupView: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                     TextField("ws://192.168.1.100:3000", text: $wsUrlInput)
-                        .textFieldStyle(.roundedBorder)
+                        .textFieldStyle(.plain)
+                        .padding(10)
+                        .background(Color.secondary.opacity(0.1))
+                        .cornerRadius(8)
                         .autocapitalization(.none)
                         .disableAutocorrection(true)
                 }
@@ -79,7 +85,6 @@ struct SetupView: View {
                 }
             }
             .buttonStyle(.borderedProminent)
-            .controlSize(.large)
             .disabled(apiUrlInput.isEmpty || viewModel.isRegistering)
 
             Spacer()

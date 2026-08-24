@@ -30,7 +30,6 @@ struct BootstrapView: View {
                     Task { await viewModel.bootstrap() }
                 }
                 .buttonStyle(.borderedProminent)
-                .controlSize(.large)
             } else if let room = viewModel.room {
                 // 显示房间码，等待管理员授权
                 VStack(spacing: 16) {
