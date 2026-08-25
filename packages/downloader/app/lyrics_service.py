@@ -4,8 +4,9 @@
 LyricsAPI.init() 的「一次性构造全部源」解耦：任一源（尤其网易云的游客登录）
 初始化失败时，不影响其它源可用。
 
-歌词结果序列化为标准 LRC（行级时间戳），不依赖上游已被裁掉的
-core/converter（Lyrics.to() 会导入 converter，不可用）。
+歌词结果序列化为 LRC：当某行含字级时间戳时输出增强型 LRC
+（行内内嵌 <mm:ss.xx> 字级标签，保留逐字时间轴），否则为行级 LRC。
+不依赖上游已被裁掉的 core/converter（Lyrics.to() 会导入 converter）。
 """
 import os
 import sys
@@ -159,20 +160,28 @@ def submit_lyrics_search(keyword: str, sources: Optional[List[str]] = None) -> s
     return search_id
 
 
-def _fmt_time(ms: int) -> str:
-    """毫秒 -> LRC 时间戳 [MM:SS.xx]（百分秒，标准 .lrc 格式）。"""
+def _fmt_ts(ms: int) -> str:
+    """毫秒 -> LRC 时间戳 MM:SS.xx（百分秒，标准 .lrc 格式）。"""
     ms = max(int(ms), 0)
     mm, rem = divmod(ms, 60000)
     ss, cs = divmod(rem, 1000)
     return f"{mm:02d}:{ss:02d}.{cs // 10:02d}"
 
 
-def lyrics_to_lrc(lyrics) -> str:
-    """把 LDDC 的 Lyrics / FSLyrics 序列化为标准行级 LRC 文本。
+def _fmt_time(ms: int) -> str:
+    return f"[{_fmt_ts(ms)}]"
 
-    优先取「完整时间戳」视图（get_fslyrics，可推断缺失行时间戳），
-    缺失时回落到原始行数据；只取原语言歌词（orig）。逐字时间戳不展开
-    （本项目当前仅抓取覆盖，不做逐字增强）。
+
+def lyrics_to_lrc(lyrics) -> str:
+    """把 LDDC 的 Lyrics / FSLyrics 序列化为 LRC 文本。
+
+    优先取「完整时间戳」视图（get_fslyrics，可推断缺失行/字时间戳），
+    只取原语言歌词（orig）。
+
+    若某行含真实字级时间戳（该行 ≥2 个词且 ≥2 个不同起播时间，
+    排除 Lrclib 这类「整行一词」的纯行级源），则输出增强型 LRC：
+    行内内嵌 <mm:ss.xx>字级标签（形如 `[00:12.34]<00:12.34>故<00:12.80>事`），
+    保留逐字时间轴，供支持逐字的播放端使用；否则回落为行级 LRC。
     """
     lang_data = None
     try:
@@ -189,11 +198,29 @@ def lyrics_to_lrc(lyrics) -> str:
         start = getattr(line, "start", None)
         if start is None:
             continue
-        words = getattr(line, "words", []) or []
-        text = "".join(getattr(w, "text", "") or "" for w in words).strip()
-        if not text:
+        words = [w for w in (getattr(line, "words", []) or []) if getattr(w, "text", None)]
+        if not words:
             continue
-        lines.append(f"[{_fmt_time(start)}]{text}")
+        starts = [getattr(w, "start", None) for w in words]
+        has_word_ts = len(words) >= 2 and len({s for s in starts if s is not None}) >= 2
+        if has_word_ts:
+            parts: List[str] = []
+            for w in words:
+                w_start = getattr(w, "start", None)
+                if w_start is None:
+                    parts.append(getattr(w, "text", "") or "")
+                    continue
+                seg = f"<{_fmt_ts(w_start)}>{getattr(w, 'text', '') or ''}"
+                w_end = getattr(w, "end", None)
+                if w_end is not None:
+                    seg += f"<{_fmt_ts(w_end)}>"
+                parts.append(seg)
+            lines.append(f"{_fmt_time(start)}{''.join(parts)}")
+        else:
+            text = "".join(getattr(w, "text", "") or "" for w in words).strip()
+            if not text:
+                continue
+            lines.append(f"{_fmt_time(start)}{text}")
     if not lines:
         return ""
     return "\n".join(lines) + "\n"

@@ -31,9 +31,16 @@ import {
   X,
 } from 'lucide-react';
 
+interface LyricWord {
+  text: string;
+  start: number;
+  end: number;
+}
+
 interface LyricLine {
   time: number;
   text: string;
+  words?: LyricWord[]; // 逐字歌词（源 LRC 含 <mm:ss.xx> 时存在）
 }
 
 interface LyricsResponse {
