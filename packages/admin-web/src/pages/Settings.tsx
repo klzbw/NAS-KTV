@@ -17,6 +17,7 @@ import {
   Shield,
   Fingerprint,
   Copy,
+  Film,
 } from 'lucide-react';
 import { aiParseApi } from '../api/ai-parse';
 import { settingsApi } from '../api/settings';
@@ -25,13 +26,14 @@ import type { BackupInfo } from '../api/backup';
 import { downloadApi, type PlatformInfo } from '../api/download';
 import { systemApi } from '../api/system';
 import type { SystemInfo } from '../api/system';
+import { separatorApi, type GpuInfo } from '../api/separator';
 import type { AiParseConfig } from '../types';
 import Button from '../components/Button';
 import Input from '../components/Input';
 import ConfirmModal from '../components/ConfirmModal';
 import Loading from '../components/Loading';
 import { useToast } from '../components/Toast';
-import { SEPARATION_MODELS, type SeparationModel } from '../constants';
+import { SEPARATION_MODELS, type SeparationModel, TRANSCODE_PROFILES, type TranscodeProfile } from '../constants';
 
 interface ScanSettings {
   scanRoot: string;
@@ -43,6 +45,12 @@ interface SeparationSettings {
   model: SeparationModel;
   concurrency: number;
   autoSeparation: boolean;
+}
+
+interface TranscodeSettings {
+  profile: TranscodeProfile;
+  concurrency: number;
+  autoTranscode: boolean;
 }
 
 const STORAGE_KEY = 'nasktv:settings';
@@ -57,6 +65,12 @@ const defaultSeparation: SeparationSettings = {
   model: 'htdemucs',
   concurrency: 1,
   autoSeparation: false,
+};
+
+const defaultTranscode: TranscodeSettings = {
+  profile: 'standard',
+  concurrency: 1,
+  autoTranscode: false,
 };
 
 const defaultSystemInfo: SystemInfo = {
@@ -78,23 +92,26 @@ function formatBytes(bytes: number): string {
 function loadLocalSettings(): {
   scan: ScanSettings;
   separation: SeparationSettings;
+  transcode: TranscodeSettings;
 } {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { scan: defaultScan, separation: defaultSeparation };
+    if (!raw) return { scan: defaultScan, separation: defaultSeparation, transcode: defaultTranscode };
     const parsed = JSON.parse(raw);
     return {
       scan: { ...defaultScan, ...(parsed.scan ?? {}) },
       separation: { ...defaultSeparation, ...(parsed.separation ?? {}) },
+      transcode: { ...defaultTranscode, ...(parsed.transcode ?? {}) },
     };
   } catch {
-    return { scan: defaultScan, separation: defaultSeparation };
+    return { scan: defaultScan, separation: defaultSeparation, transcode: defaultTranscode };
   }
 }
 
 function saveLocalSettings(data: {
   scan: ScanSettings;
   separation: SeparationSettings;
+  transcode: TranscodeSettings;
 }) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -235,6 +252,7 @@ export default function Settings() {
 
   const [scan, setScan] = useState<ScanSettings>(defaultScan);
   const [separation, setSeparation] = useState<SeparationSettings>(defaultSeparation);
+  const [transcode, setTranscode] = useState<TranscodeSettings>(defaultTranscode);
   const [systemInfo, setSystemInfo] = useState<SystemInfo>(defaultSystemInfo);
 
   const [h5BaseUrl, setH5BaseUrl] = useState('');
@@ -251,6 +269,10 @@ export default function Settings() {
   const [downloadConcurrency, setDownloadConcurrency] = useState(2);
   // 下载配置最多同时默认选中的平台数（与下载页一致）
   const MAX_DOWNLOAD_SOURCES = 3;
+
+  // 人声分离推理设备（cpu | cuda | auto）+ GPU 探测结果（用于选择 cuda 时的可用性校验）
+  const [separatorDevice, setSeparatorDevice] = useState<'auto' | 'cpu' | 'cuda'>('auto');
+  const [gpuProbe, setGpuProbe] = useState<GpuInfo | null>(null);
 
   // 备份管理
   const [backups, setBackups] = useState<BackupInfo[]>([]);
@@ -277,6 +299,7 @@ export default function Settings() {
     const local = loadLocalSettings();
     setScan(local.scan);
     setSeparation(local.separation);
+    setTranscode(local.transcode);
 
     setAiLoading(true);
     try {
@@ -330,6 +353,25 @@ export default function Settings() {
       if (md5 !== undefined) setMd5Dedup(md5 !== 'false');
       const aiD = byKey.get('ai_dedup_enabled');
       if (aiD !== undefined) setAiDedup(aiD === 'true');
+
+      // 转码配置
+      const tcAuto = byKey.get('transcode_auto_enable');
+      if (tcAuto !== undefined) {
+        setTranscode(t => ({ ...t, autoTranscode: tcAuto === 'true' }));
+      }
+      const tcProfile = byKey.get('transcode_profile');
+      if (tcProfile && TRANSCODE_PROFILES.some(m => m.value === tcProfile)) {
+        setTranscode(t => ({ ...t, profile: tcProfile as TranscodeProfile }));
+      }
+      const tcConcurrency = byKey.get('transcode_concurrency');
+      if (tcConcurrency !== undefined && !Number.isNaN(Number(tcConcurrency))) {
+        setTranscode(t => ({ ...t, concurrency: Number(tcConcurrency) }));
+      }
+      // 人声分离推理设备
+      const sepDevice = byKey.get('separator_device');
+      if (sepDevice === 'cpu' || sepDevice === 'cuda' || sepDevice === 'auto') {
+        setSeparatorDevice(sepDevice);
+      }
     } catch {
       // keep defaults on error
     } finally {
@@ -357,6 +399,14 @@ export default function Settings() {
       // 下载服务不可用时保留默认，不阻断其它设置加载
     }
 
+    // 探测分离服务 GPU 能力（用于「推理设备」选 cuda 时的可用性校验；失败仅保留未知状态）
+    try {
+      const info = await separatorApi.getGpuInfo();
+      setGpuProbe(info);
+    } catch {
+      // 分离服务不可用/未就绪时保留 null
+    }
+
   }, [showToast]);
 
   useEffect(() => {
@@ -366,7 +416,7 @@ export default function Settings() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      saveLocalSettings({ scan, separation });
+      saveLocalSettings({ scan, separation, transcode });
       await aiParseApi.updateConfig({
         baseUrl: aiConfig.baseUrl,
         apiKey: aiConfig.apiKey,
@@ -387,6 +437,10 @@ export default function Settings() {
         { key: 'ai_dedup_enabled', value: String(aiDedup) },
         { key: 'downloader_default_sources', value: downloadDefaultSources.join(',') },
         { key: 'downloader_concurrency', value: String(downloadConcurrency) },
+        { key: 'transcode_auto_enable', value: String(transcode.autoTranscode) },
+        { key: 'transcode_profile', value: transcode.profile },
+        { key: 'transcode_concurrency', value: String(transcode.concurrency) },
+        { key: 'separator_device', value: separatorDevice },
       ]);
       showToast('success', '设置已保存');
     } catch (err) {
@@ -532,7 +586,7 @@ export default function Settings() {
             系统设置
           </h1>
           <p className="text-sm text-ink-3">
-            配置扫描、分离、AI 解析等系统级参数
+            配置扫描、分离、转码、AI 解析等系统级参数
           </p>
         </div>
         <Button
@@ -644,6 +698,68 @@ export default function Settings() {
               }}
               hint="同时执行分离任务的最大数量（1-8）"
             />
+            <div className="flex flex-col">
+              <label className="block text-sm font-medium text-ink-2 mb-xs">
+                推理设备
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {(['auto', 'cpu', 'cuda'] as const).map((dev) => {
+                  const active = separatorDevice === dev;
+                  const cudaUnsupported =
+                    dev === 'cuda' && gpuProbe !== null && !gpuProbe.cuda_available;
+                  const disabled = cudaUnsupported;
+                  return (
+                    <button
+                      key={dev}
+                      type="button"
+                      disabled={disabled}
+                      onClick={() => {
+                        if (dev === 'cuda' && gpuProbe !== null && !gpuProbe.cuda_available) {
+                          showToast('error', '当前环境 CUDA 不可用（PyTorch 为 CPU 版或驱动缺失），无法选择 GPU');
+                          return;
+                        }
+                        if (dev === 'cuda' && gpuProbe === null) {
+                          showToast('error', '无法确认分离服务 GPU 状态，请确认分离服务已启动后再选择');
+                          return;
+                        }
+                        setSeparatorDevice(dev);
+                      }}
+                      aria-pressed={active}
+                      title={
+                        disabled
+                          ? '当前环境 CUDA 不可用（需 GPU 版 PyTorch 与 NVIDIA 驱动）'
+                          : undefined
+                      }
+                      className={[
+                        'inline-flex items-center h-8 px-3 rounded-md text-sm border transition-colors',
+                        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-paper',
+                        disabled
+                          ? 'opacity-40 cursor-not-allowed border-border text-ink-2'
+                          : active
+                            ? 'border-accent bg-[color-mix(in_oklch,var(--color-accent)_14%,transparent)] text-accent'
+                            : 'border-border text-ink-2 hover:bg-paper-2',
+                      ].join(' ')}
+                    >
+                      {dev === 'auto' ? '自动' : dev === 'cpu' ? 'CPU' : 'GPU'}
+                    </button>
+                  );
+                })}
+              </div>
+              {gpuProbe ? (
+                <p className="text-xs text-ink-3 mt-xs">
+                  {gpuProbe.cuda_available
+                    ? `检测到 GPU（${gpuProbe.name ?? '—'}）· PyTorch ${gpuProbe.torch_version ?? '—'}，支持 GPU 推理`
+                    : `当前 CUDA 不可用（${gpuProbe.torch_available ? `PyTorch ${gpuProbe.torch_version ?? ''} 为 CPU 版或驱动缺失` : 'PyTorch 未就绪'}），只能使用 CPU`}
+                </p>
+              ) : (
+                <p className="text-xs text-ink-3 mt-xs">
+                  分离服务不可用，无法探测 GPU 状态；保存后配置仍会下发，实际设备以分离服务为准
+                </p>
+              )}
+              <p className="text-xs text-ink-3 mt-1">
+                auto 自动探测（推荐）；GPU 需 CUDA 版 PyTorch 与 NVIDIA 驱动，保存后下一次分离任务生效
+              </p>
+            </div>
             <div className="border-t border-border">
               <Toggle
                 label="自动人声分离"
@@ -651,6 +767,70 @@ export default function Settings() {
                 checked={separation.autoSeparation}
                 onChange={(v) =>
                   setSeparation((s) => ({ ...s, autoSeparation: v }))
+                }
+              />
+            </div>
+          </div>
+        </SettingCard>
+
+        {/* Transcode settings */}
+        <SettingCard
+          icon={<Film className="w-5 h-5" />}
+          title="转码配置"
+          description="MV 转码画质预设与并发控制"
+        >
+          <div className="space-y-sm">
+            <div className="flex flex-col">
+              <label className="block text-sm font-medium text-ink-2 mb-xs">
+                转码画质预设
+              </label>
+              <select
+                value={transcode.profile}
+                onChange={(e) =>
+                  setTranscode((s) => ({
+                    ...s,
+                    profile: e.target.value as TranscodeSettings['profile'],
+                  }))
+                }
+                className={[
+                  'w-full rounded-md border border-border bg-paper text-ink text-sm',
+                  'px-3 py-2 focus-visible:outline-none focus-visible:border-accent focus-visible:ring-2',
+                  'focus-visible:ring-accent',
+                ].join(' ')}
+              >
+                {TRANSCODE_PROFILES.map(m => (
+                  <option key={m.value} value={m.value}>
+                    {m.label}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-ink-3 mt-xs">
+                {TRANSCODE_PROFILES.find(m => m.value === transcode.profile)?.hint}
+              </p>
+            </div>
+            <Input
+              label="并发数"
+              type="number"
+              min="1"
+              max="8"
+              step="1"
+              value={String(transcode.concurrency)}
+              onChange={(e) => {
+                const n = parseInt(e.target.value, 10);
+                setTranscode((s) => ({
+                  ...s,
+                  concurrency: Number.isFinite(n) && n > 0 ? n : 1,
+                }));
+              }}
+              hint="同时执行转码任务的最大数量（1-8）"
+            />
+            <div className="border-t border-border">
+              <Toggle
+                label="自动转码 MV"
+                description="新视频歌曲入库后自动触发转码为通用播放格式"
+                checked={transcode.autoTranscode}
+                onChange={(v) =>
+                  setTranscode((s) => ({ ...s, autoTranscode: v }))
                 }
               />
             </div>

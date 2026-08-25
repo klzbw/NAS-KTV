@@ -4,7 +4,9 @@ import * as settingsService from '../services/settings-service';
 import { authenticateToken } from '../middleware/jwt';
 import { separationQueue } from '../services/separation-queue';
 import { aiParseQueue } from '../services/ai-queue';
+import { transcodeQueue } from '../services/transcode-queue';
 import { downloaderClient } from '../services/downloader-client';
+import { separatorClient } from '../services/separator-client';
 
 const router = Router();
 
@@ -62,6 +64,9 @@ router.put('/', authenticateToken, async (req: Request, res: Response) => {
     if (keys.includes('separation_concurrency')) {
       await separationQueue.updateConcurrency();
     }
+    if (keys.includes('transcode_concurrency')) {
+      await transcodeQueue.updateConcurrency();
+    }
     if (keys.includes('ai_parse_concurrency')) {
       await aiParseQueue.updateConcurrency();
     }
@@ -75,6 +80,18 @@ router.put('/', authenticateToken, async (req: Request, res: Response) => {
         downloaderClient
           .configure({ concurrency: n })
           .catch((e) => logger.warn('推送下载并发到下载服务失败:', e));
+      }
+    }
+    if (keys.includes('separator_device')) {
+      const item = settings.find(
+        (s: { key: string; value: string }) => s.key === 'separator_device',
+      );
+      const value = item?.value.trim().toLowerCase();
+      if (value === 'cpu' || value === 'cuda' || value === 'auto') {
+        // 推送分离推理设备到分离服务（失败仅告警，不影响设置已保存）
+        separatorClient
+          .pushConfig({ device: value })
+          .catch((e) => logger.warn('推送分离推理设备到分离服务失败:', e));
       }
     }
 

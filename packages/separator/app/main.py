@@ -10,9 +10,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.models import (
     HealthResponse, SeparateRequest, SeparateResponse, TaskStatusResponse,
     GpuInfoResponse, InstallResponse, InstallStatusResponse,
+    ConfigRequest, ConfigResponse,
 )
 from app.worker import worker
 from app.install_manager import install_manager
+from app.demucs_runner import (
+    set_device as _set_runner_device,
+    get_device as _get_runner_device,
+    get_configured_device as _get_configured_device,
+)
 
 # 手动加载项目根目录 .env 文件（不依赖 python-dotenv）
 # 从本文件逐级向上查找，兼容本地（仓库根）与 Docker（/app）不同层级
@@ -164,7 +170,7 @@ async def health_check():
         queue_size = 0
     install_status = await install_manager.get_status()
     return HealthResponse(
-        device=device,
+        device=_get_runner_device(),
         ffmpeg_available=check_ffmpeg(),
         model_loaded=model_loaded,
         queue_size=queue_size,
@@ -172,6 +178,21 @@ async def health_check():
         install_state=install_status['state'],
         install_stage=install_status['stage'],
         install_progress=install_status['progress'],
+    )
+
+@app.post("/api/config", response_model=ConfigResponse)
+async def set_runtime_config(request: ConfigRequest):
+    """运行时配置：设置人声分离推理设备（cpu/cuda/auto）。
+
+    保存后下一次分离任务即用新设备（auto 会重新探测 CUDA 可用性）。
+    显式指定 cuda 但当前 CUDA 不可用时，推理会自动回落 CPU（模型加载有兜底）。
+    """
+    _set_runner_device(request.device)
+    logger.info(f"Runtime config updated: device={request.device}")
+    return ConfigResponse(
+        status="ok",
+        device=_get_runner_device(),
+        configured=_get_configured_device(),
     )
 
 @app.post("/api/separate", response_model=SeparateResponse)

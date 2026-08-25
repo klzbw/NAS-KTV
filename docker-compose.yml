@@ -11,6 +11,7 @@ services:
       - ./data/db:/app/data/db
       - ./data/songs:/app/data/songs
       - ./data/separation:/app/data/separation
+      - ./data/transcoded:/app/data/transcoded
       - ./data/uploads:/app/data/uploads
     environment:
       - NODE_ENV=production
@@ -22,6 +23,10 @@ services:
       - SEPARATION_OUTPUT_DIR=/app/data/separation
       - SEPARATION_CONCURRENCY=${SEPARATION_CONCURRENCY:-2}
       - SEPARATION_AUTO_ENABLE=${SEPARATION_AUTO_ENABLE:-true}
+      - TRANSCODE_OUTPUT_DIR=/app/data/transcoded
+      - TRANSCODE_CONCURRENCY=${TRANSCODE_CONCURRENCY:-1}
+      - TRANSCODE_AUTO_ENABLE=${TRANSCODE_AUTO_ENABLE:-false}
+      - TRANSCODE_PROFILE=${TRANSCODE_PROFILE:-standard}
       - HF_ENDPOINT=${HF_ENDPOINT:-https://hf-mirror.com}
       - AI_ENABLED=${AI_ENABLED:-false}
       - AI_BASE_URL=${AI_BASE_URL:-https://api.openai.com/v1}

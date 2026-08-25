@@ -24,10 +24,22 @@ export const songs = sqliteTable('songs', {
   separationCompletedAt: integer('separation_completed_at', { mode: 'timestamp' }),
   separationError: text('separation_error'),
 
+  // ===== 转码（MV → 通用视频）相关字段 =====
+  transcodedPath: text('transcoded_path'),
+  transcodeStatus: text('transcode_status', {
+    enum: ['pending', 'processing', 'completed', 'failed'],
+  }),
+  transcodeProfile: text('transcode_profile'),
+  transcodeStartedAt: integer('transcode_started_at', { mode: 'timestamp' }),
+  transcodeCompletedAt: integer('transcode_completed_at', { mode: 'timestamp' }),
+  transcodeError: text('transcode_error'),
+
   aiParsed: integer('ai_parsed').default(0),
   aiParsedAt: integer('ai_parsed_at', { mode: 'timestamp' }),
   aiConfidence: real('ai_confidence'),
   aiNeedReview: integer('ai_need_review').default(0),
+  // 当前 AI 解析结果是否经过人工修改（0/1，modify 审核时置 1，列表徽标用）
+  aiManualEdited: integer('ai_manual_edited').default(0),
   rawTags: text('raw_tags'),
   fileHash: text('file_hash'),
 });

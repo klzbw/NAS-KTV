@@ -34,6 +34,12 @@ export interface DashboardStats {
     failed: number;
     needReview: number;
   };
+  transcode: {
+    pending: number;
+    processing: number;
+    completed: number;
+    failed: number;
+  };
 }
 
 export interface DashboardHistory {

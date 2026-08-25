@@ -3,11 +3,10 @@ import re
 import sys
 import json
 import shutil
-import asyncio
 import logging
 import subprocess
 import platform
-from typing import Optional, AsyncGenerator
+from typing import Optional
 from dataclasses import dataclass, asdict
 
 logger = logging.getLogger(__name__)
@@ -19,32 +18,6 @@ VENV_DIR = os.path.join(SEPARATOR_DIR, '.venv')
 PYTORCH_INDEX_URL = os.environ.get('PYTORCH_INDEX_URL') or 'https://download.pytorch.org/whl/cu124'
 PYTORCH_CPU_INDEX_URL = os.environ.get('PYTORCH_CPU_INDEX_URL') or 'https://download.pytorch.org/whl/cpu'
 
-
-async def _stream_lines(process: asyncio.subprocess.Process) -> AsyncGenerator[str, None]:
-    """按 \n 或 \r 切分流式输出，进度条（\r 刷新）可实时转发，不阻塞到命令结束。"""
-    assert process.stdout is not None
-    buffer = b''
-    while True:
-        chunk = await process.stdout.read(128)
-        if not chunk:
-            break
-        buffer += chunk
-        while True:
-            idx = min(len(buffer), *[i for i in (buffer.find(b'\n'), buffer.find(b'\r')) if i != -1] or [len(buffer)])
-            if idx == len(buffer) and idx > 0:
-                line_bytes, buffer = buffer, b''
-            elif idx < len(buffer):
-                line_bytes, buffer = buffer[:idx], buffer[idx + 1:]
-            else:
-                break
-            line = line_bytes.decode('utf-8', errors='replace').rstrip('\r')
-            if line:
-                yield line + '\n'
-
-    if buffer:
-        line = buffer.decode('utf-8', errors='replace').rstrip('\r')
-        if line:
-            yield line + '\n'
 
 def _get_venv_python() -> str:
     if IS_WINDOWS:

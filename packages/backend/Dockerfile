@@ -34,7 +34,8 @@ COPY packages/shared/package.json ./packages/shared/
 
 FROM node:20-alpine AS production
 RUN addgroup --system --gid 1001 nasktv && \
-    adduser --system --uid 1001 nasktv
+    adduser --system --uid 1001 nasktv && \
+    apk add --no-cache ffmpeg
 WORKDIR /app
 COPY --from=build --chown=nasktv:nasktv /app/packages/backend/src ./packages/backend/src
 COPY --from=build --chown=nasktv:nasktv /app/packages/backend/assets ./packages/backend/assets

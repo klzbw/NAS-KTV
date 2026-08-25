@@ -25,6 +25,11 @@ export enum WsMessageType {
   SEPARATION_COMPLETED = 'SEPARATION_COMPLETED',
   SEPARATION_FAILED = 'SEPARATION_FAILED',
 
+  TRANSCODE_STARTED = 'TRANSCODE_STARTED',
+  TRANSCODE_PROGRESS = 'TRANSCODE_PROGRESS',
+  TRANSCODE_COMPLETED = 'TRANSCODE_COMPLETED',
+  TRANSCODE_FAILED = 'TRANSCODE_FAILED',
+
   AI_PARSE_STARTED = 'AI_PARSE_STARTED',
   AI_PARSE_PROGRESS = 'AI_PARSE_PROGRESS',
   AI_PARSE_COMPLETED = 'AI_PARSE_COMPLETED',
@@ -200,6 +205,32 @@ export interface SeparationCompletedPayload {
 }
 
 export interface SeparationFailedPayload {
+  taskId: number;
+  songId: number;
+  error: string;
+}
+
+// ===== 转码相关 Payload =====
+export interface TranscodeStartedPayload {
+  taskId: number;
+  songId: number;
+  songTitle: string;
+}
+
+export interface TranscodeProgressPayload {
+  taskId: number;
+  songId: number;
+  progress: number;
+  stage: string;
+}
+
+export interface TranscodeCompletedPayload {
+  taskId: number;
+  songId: number;
+  transcodedPath: string;
+}
+
+export interface TranscodeFailedPayload {
   taskId: number;
   songId: number;
   error: string;

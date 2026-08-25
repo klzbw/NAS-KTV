@@ -139,8 +139,10 @@ export async function getSongs(params: GetSongsParams) {
       vocalsPath: songs.vocalsPath,
       instrumentalPath: songs.instrumentalPath,
       separationStatus: songs.separationStatus,
+      transcodeStatus: songs.transcodeStatus,
       aiParsed: songs.aiParsed,
       aiNeedReview: songs.aiNeedReview,
+      aiManualEdited: songs.aiManualEdited,
       artistName: artists.name,
       artistPinyin: artists.pinyin,
     })
@@ -230,6 +232,7 @@ export async function getHotSongs(limit = 20) {
       separationStatus: songs.separationStatus,
       aiParsed: songs.aiParsed,
       aiNeedReview: songs.aiNeedReview,
+      aiManualEdited: songs.aiManualEdited,
       artistName: artists.name,
       artistPinyin: artists.pinyin,
     })

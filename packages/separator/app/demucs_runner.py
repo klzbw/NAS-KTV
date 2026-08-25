@@ -13,16 +13,42 @@ class TaskCancelledError(Exception):
 _model_cache: Dict[str, Any] = {}
 _model_lock = threading.Lock()
 _device = "cpu"
+# 用户配置的推理设备：cpu | cuda | auto（auto=启动/任务时按 CUDA 可用性自动探测）
+_configured = "auto"
 
 def get_device() -> str:
     """获取当前设备"""
     return _device
 
+def get_configured_device() -> str:
+    """获取用户配置的设备（cpu | cuda | auto）"""
+    return _configured
+
 def set_device(device: str):
-    """设置设备"""
-    global _device
-    _device = device
-    logger.info(f"Device set to: {device}")
+    """设置推理设备：cpu | cuda | auto。
+
+    - auto：按 torch.cuda.is_available() 自动探测（默认）
+    - cpu / cuda：强制指定
+    非法值忽略，保持原配置。
+    """
+    global _device, _configured
+    if device not in ("cpu", "cuda", "auto"):
+        logger.warning(f"Invalid device '{device}', ignoring (valid: cpu|cuda|auto)")
+        return
+    _configured = device
+    if device == "auto":
+        try:
+            import torch
+            _device = "cuda" if torch.cuda.is_available() else "cpu"
+        except ImportError:
+            _device = "cpu"
+    else:
+        _device = device
+    logger.info(f"Device set to: {_device} (configured: {_configured})")
+
+def apply_configured_device():
+    """按当前配置应用设备（worker 启动/任务前调用；auto 会重新探测一次）。"""
+    set_device(get_configured_device())
 
 def release_gpu_resources():
     """
