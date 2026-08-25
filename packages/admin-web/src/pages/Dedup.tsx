@@ -408,6 +408,7 @@ export default function Dedup() {
                   loadDedupTasks(p, pageSize);
                 }}
                 pageSize={pageSize}
+                total={taskTotal}
                 onPageSizeChange={(s) => {
                   setPageSize(s);
                   setPage(1);

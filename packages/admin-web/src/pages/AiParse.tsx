@@ -1132,6 +1132,7 @@ export default function AiParse() {
               totalPages={totalPages}
               onPageChange={setPage}
               pageSize={pageSize}
+              total={total}
               onPageSizeChange={(s) => {
                 setPageSize(s);
                 setPage(1);
@@ -1592,6 +1593,7 @@ export default function AiParse() {
             <Pagination
               currentPage={songPickerPage}
               totalPages={Math.ceil(songPickerTotal / 20)}
+              total={songPickerTotal}
               onPageChange={p => {
                 setSongPickerPage(p);
                 loadSongPicker(p, songPickerKeyword);

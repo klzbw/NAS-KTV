@@ -797,13 +797,13 @@ export default function Separation() {
 
         {total > 0 && (
           <div className="border-t border-border">
-            <div className="px-md pt-sm text-xs text-ink-3">共 {total} 条任务</div>
             <Pagination
               currentPage={page}
               totalPages={totalPages}
               onPageChange={setPage}
               state={loading ? 'loading' : 'default'}
               pageSize={pageSize}
+              total={total}
               onPageSizeChange={(s) => {
                 setPageSize(s);
                 setPage(1);

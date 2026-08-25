@@ -394,6 +394,7 @@ export default function Artists() {
           totalPages={totalPages}
           onPageChange={setPage}
           pageSize={pageSize}
+          total={total}
           onPageSizeChange={(s) => {
             setPageSize(s);
             setPage(1);

@@ -19,6 +19,7 @@ import Loading from '../components/Loading';
 import SearchableSelect from '../components/SearchableSelect';
 import AiParseResultEditor from '../components/AiParseResultEditor';
 import { useToast } from '../components/Toast';
+import LyricsSearchModal from '../components/LyricsSearchModal';
 import { songsApi } from '../api/songs';
 import { aiParseApi } from '../api/ai-parse';
 import { separationApi } from '../api/separation';
@@ -198,6 +199,7 @@ export default function Songs() {
   const pendingDeleteRef = useRef<{ songs: Song[]; count: number } | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [clearLyricsConfirmOpen, setClearLyricsConfirmOpen] = useState(false);
+  const [searchLyricsOpen, setSearchLyricsOpen] = useState(false);
 
   // 单首 AI 解析 / 人声分离 / 转码二次确认
   const [pendingAiParse, setPendingAiParse] = useState<Song | null>(null);
@@ -779,7 +781,6 @@ export default function Songs() {
       <div className="flex items-center justify-between gap-md">
         <h1 className="text-2xl font-display font-bold text-ink">歌曲管理</h1>
         <div className="flex items-center gap-sm">
-          <p className="text-sm text-ink-3">共 {total} 首</p>
           <Button
             size="sm"
             variant="ghost"
@@ -1191,24 +1192,18 @@ export default function Songs() {
       </div>
 
       {/* Pagination */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-md">
-        <p className="text-sm text-ink-3">
-          共 {total} 条 · 第 {page}/{totalPages} 页 · 每页 {pageSize} 条
-        </p>
-        <div className="flex justify-end">
-          <Pagination
-            currentPage={page}
-            totalPages={totalPages}
-            onPageChange={setPage}
-            state={loading ? 'loading' : 'default'}
-            pageSize={pageSize}
-            onPageSizeChange={(s) => {
-              setPageSize(s);
-              setPage(1);
-            }}
-          />
-        </div>
-      </div>
+      <Pagination
+        currentPage={page}
+        totalPages={totalPages}
+        onPageChange={setPage}
+        state={loading ? 'loading' : 'default'}
+        pageSize={pageSize}
+        total={total}
+        onPageSizeChange={(s) => {
+          setPageSize(s);
+          setPage(1);
+        }}
+      />
 
       {/* Edit modal */}
       <Modal
@@ -1294,15 +1289,26 @@ export default function Songs() {
                 <span className="text-accent">（当前 {lyricsLineCount} 行）</span>
               )}
             </p>
-            <Button
-              variant="secondary"
-              size="sm"
-              leftIcon={<Upload className="w-3.5 h-3.5" />}
-              onClick={() => lyricsFileInputRef.current?.click()}
-              disabled={lyricsLoading || lyricsSaving}
-            >
-              上传 .lrc
-            </Button>
+            <div className="flex items-center gap-sm shrink-0">
+              <Button
+                variant="secondary"
+                size="sm"
+                leftIcon={<Upload className="w-3.5 h-3.5" />}
+                onClick={() => lyricsFileInputRef.current?.click()}
+                disabled={lyricsLoading || lyricsSaving}
+              >
+                上传 .lrc
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                leftIcon={<Search className="w-3.5 h-3.5" />}
+                onClick={() => setSearchLyricsOpen(true)}
+                disabled={lyricsLoading || lyricsSaving}
+              >
+                搜索歌词
+              </Button>
+            </div>
             <input
               ref={lyricsFileInputRef}
               type="file"
@@ -1344,6 +1350,18 @@ export default function Songs() {
           </div>
         </div>
       </Modal>
+
+      {/* 歌词搜索弹框：选中候选后回填到歌词编辑器，由上方「保存歌词」统一落盘（含 .bak 备份） */}
+      <LyricsSearchModal
+        isOpen={searchLyricsOpen}
+        onClose={() => setSearchLyricsOpen(false)}
+        song={lyricsSong}
+        onApply={(lrc: string) => {
+          setLyricsContent(lrc);
+          setLyricsLineCount(lrc.split('\n').filter(Boolean).length);
+          showToast('success', '已填入歌词，请确认后保存');
+        }}
+      />
 
       {/* 删除确认弹窗 */}
       <ConfirmModal
