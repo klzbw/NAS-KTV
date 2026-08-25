@@ -186,6 +186,7 @@ class AiParseQueue {
           .set({
             status: 'completed',
             result: JSON.stringify(parseResult.result),
+            aiResult: JSON.stringify(parseResult.result),
             requestMessages: JSON.stringify(parseResult.requestMessages),
             responseRaw: parseResult.responseRaw,
             originalTitle: parseResult.originalTitle,

@@ -19,6 +19,18 @@ export interface AiParseTask {
   createdAt: string;
   startedAt: string | null;
   completedAt: string | null;
+  /** AI 原始解析结果 JSON 快照（人工修改后仍可对比） */
+  aiResult: string | null;
+  /** 是否人工修改过解析结果（0/1） */
+  manualEdited: number;
+  /** 审核动作：approve / modify / reject */
+  reviewAction: string | null;
+  /** 审核人 */
+  reviewedBy: string | null;
+  /** 审核时间 */
+  reviewedAt: string | null;
+  /** 审核备注 */
+  reviewNote: string | null;
   song?: { id: number; title: string; filePath: string; artistName?: string; artistNames?: string[] };
 }
 
@@ -43,6 +55,8 @@ export interface AiParseTaskListParams {
 export interface AiParseReviewParams {
   action: 'approve' | 'reject' | 'modify';
   modifiedResult?: Record<string, unknown>;
+  /** 审核备注（可选） */
+  reviewNote?: string;
 }
 
 export interface AiParseStats {

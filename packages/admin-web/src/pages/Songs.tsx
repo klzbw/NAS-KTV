@@ -3,9 +3,10 @@
  * states: default · hover · focus-visible · active · disabled · loading · error · success
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useSearchParams } from 'react-router-dom';
-import { Pencil, Trash2, Bot, Mic, Music, Search, RotateCcw, Headphones, Film, X, FileText, Upload, RefreshCw, ClipboardCheck } from 'lucide-react';
+import { Pencil, Trash2, Bot, Mic, Music, Search, RotateCcw, Headphones, Film, X, FileText, Upload, RefreshCw, ClipboardCheck, MoreVertical } from 'lucide-react';
 import Button from '../components/Button';
 import EmptyState from '../components/EmptyState';
 import ConfirmModal from '../components/ConfirmModal';
@@ -16,6 +17,7 @@ import AudioPreviewModal from '../components/AudioPreviewModal';
 import VideoPreviewModal from '../components/VideoPreviewModal';
 import Loading from '../components/Loading';
 import SearchableSelect from '../components/SearchableSelect';
+import AiParseResultEditor from '../components/AiParseResultEditor';
 import { useToast } from '../components/Toast';
 import { songsApi } from '../api/songs';
 import { aiParseApi } from '../api/ai-parse';
@@ -41,6 +43,16 @@ function safeParseJson(raw: string | null | undefined): Record<string, unknown> 
   }
 }
 
+// 拆分源文件路径为 文件名 + 目录（审核界面展示用，兼容 / 与 \ 分隔符）
+function splitFilePath(p?: string | null): { name: string; dir: string } {
+  if (!p) return { name: '—', dir: '' };
+  const norm = p.replace(/\\/g, '/');
+  const idx = norm.lastIndexOf('/');
+  return idx >= 0
+    ? { name: norm.slice(idx + 1), dir: norm.slice(0, idx) }
+    : { name: norm, dir: '' };
+}
+
 function ReviewCompareRow({ label, current, suggested }: { label: string; current: string; suggested: string }) {
   const changed = suggested !== '—' && suggested !== current;
   return (
@@ -54,11 +66,20 @@ function ReviewCompareRow({ label, current, suggested }: { label: string; curren
   );
 }
 
-function aiParseBadge(aiParsed: number, aiNeedReview?: number): {
-  variant: 'success' | 'neutral' | 'warning';
+function aiParseBadge(
+  aiParsed: number,
+  aiNeedReview?: number,
+  aiManualEdited?: number,
+): {
+  variant: 'success' | 'neutral' | 'warning' | 'info';
   label: string;
 } {
-  if (aiParsed === 1) return { variant: 'success', label: '已解析' };
+  if (aiParsed === 1) {
+    // 已解析且结果经人工修改：突出展示干预痕迹
+    return aiManualEdited === 1
+      ? { variant: 'info', label: '已解析·人工修改' }
+      : { variant: 'success', label: '已解析' };
+  }
   // aiParsed===2：待审核（仍需处理）与已审阅（已被拒绝/保留本地）区分开
   if (aiParsed === 2 && aiNeedReview === 1) return { variant: 'warning', label: '待审核' };
   if (aiParsed === 2) return { variant: 'neutral', label: '已审阅' };
@@ -78,6 +99,24 @@ function separationBadge(status?: string | null): {
       return { variant: 'danger', label: '失败' };
     default:
       return { variant: 'neutral', label: '未开始' };
+  }
+}
+
+function transcodeBadge(status?: string | null): {
+  variant: 'success' | 'warning' | 'neutral' | 'danger';
+  label: string;
+} {
+  switch (status) {
+    case 'completed':
+      return { variant: 'success', label: '已完成' };
+    case 'processing':
+      return { variant: 'warning', label: '处理中' };
+    case 'pending':
+      return { variant: 'neutral', label: '待处理' };
+    case 'failed':
+      return { variant: 'danger', label: '失败' };
+    default:
+      return { variant: 'neutral', label: '—' };
   }
 }
 
@@ -148,6 +187,9 @@ export default function Songs() {
   const [reviewTask, setReviewTask] = useState<import('../api/ai-parse').AiParseTask | null>(null);
   const [reviewLoading, setReviewLoading] = useState(false);
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  // 人工干预编辑状态：在 AI 解析结果基础上修改后审核保存
+  const [reviewDraft, setReviewDraft] = useState<Record<string, unknown> | null>(null);
+  const [reviewNote, setReviewNote] = useState('');
 
   const [pendingDelete, setPendingDeleteState] = useState<{
     songs: Song[];
@@ -157,9 +199,15 @@ export default function Songs() {
   const [deleting, setDeleting] = useState(false);
   const [clearLyricsConfirmOpen, setClearLyricsConfirmOpen] = useState(false);
 
-  // 单首 AI 解析 / 人声分离二次确认
+  // 单首 AI 解析 / 人声分离 / 转码二次确认
   const [pendingAiParse, setPendingAiParse] = useState<Song | null>(null);
   const [pendingSeparation, setPendingSeparation] = useState<Song | null>(null);
+  const [pendingTranscode, setPendingTranscode] = useState<Song | null>(null);
+
+  // 行内「更多」下拉菜单：记录当前展开的是哪一行（-1 表示全部关闭）
+  const [openMenuId, setOpenMenuId] = useState<number>(-1);
+  // 当前打开菜单的「更多」按钮 DOM，用于 Portal 定位（点击时用 e.currentTarget 赋值）
+  const openMenuButtonRef = useRef<HTMLButtonElement | null>(null);
 
   const confirmAiParse = () => {
     const s = pendingAiParse;
@@ -171,6 +219,12 @@ export default function Songs() {
     const s = pendingSeparation;
     setPendingSeparation(null);
     if (s) triggerSeparation(s);
+  };
+
+  const confirmTranscode = () => {
+    const s = pendingTranscode;
+    setPendingTranscode(null);
+    if (s) triggerTranscode(s);
   };
 
   const setPendingDelete = useCallback((v: { songs: Song[]; count: number } | null) => {
@@ -241,6 +295,52 @@ export default function Songs() {
   useEffect(() => {
     fetchSongs();
   }, [fetchSongs]);
+
+  // 订阅转码进度 WS：按 songId 实时刷新列表行的 transcodeStatus，
+  // 解决"提交转码后列表状态不更新"的问题（后端 transcode-handler 已完整推送）。
+  useEffect(() => {
+    const wsBaseUrl = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws?token=${encodeURIComponent(localStorage.getItem('token') ?? '')}`;
+    let ws: WebSocket | null = null;
+    try {
+      ws = new WebSocket(wsBaseUrl);
+    } catch {
+      return;
+    }
+    ws.onmessage = (event) => {
+      try {
+        const message = JSON.parse(event.data);
+        const type: string = message.type;
+        const payload = message.payload ?? message.data ?? {};
+        const songId: number | undefined = payload.songId;
+        if (!songId) return;
+
+        if (type === 'TRANSCODE_STARTED') {
+          patchSong(songId, { transcodeStatus: 'processing' });
+        } else if (type === 'TRANSCODE_PROGRESS') {
+          patchSong(songId, { transcodeStatus: 'processing' });
+        } else if (type === 'TRANSCODE_COMPLETED') {
+          patchSong(songId, { transcodeStatus: 'completed' });
+        } else if (type === 'TRANSCODE_FAILED') {
+          patchSong(songId, { transcodeStatus: 'failed' });
+        }
+      } catch {
+        // 忽略畸形消息
+      }
+    };
+    return () => { ws?.close(); };
+  }, []);
+
+  // 关闭「更多」下拉：按 Esc（点击外部由 RowMoreMenu 内部处理，因为菜单渲染在 Portal 中）
+  useEffect(() => {
+    if (openMenuId < 0) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpenMenuId(-1);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [openMenuId]);
 
   // 手动刷新：保留当前表格内容，仅按钮旋转；强制至少展示 400ms 保证可见
   const handleRefresh = () => {
@@ -530,10 +630,33 @@ export default function Songs() {
     }
   };
 
+  const triggerTranscode = async (song: Song) => {
+    if (busyIds.has(song.id)) return;
+    setBusyIds((prev) => new Set(prev).add(song.id));
+    const prev = song.transcodeStatus;
+    // 后端入队后立即置 processing，WS 会持续推送真实状态，避免乐观值卡在 pending
+    patchSong(song.id, { transcodeStatus: 'processing' });
+    try {
+      await songsApi.transcode(song.id);
+      showToast('success', `歌曲「${song.title}」转码任务已提交`);
+    } catch {
+      patchSong(song.id, { transcodeStatus: prev });
+      showToast('error', '转码任务提交失败');
+    } finally {
+      setBusyIds((prev) => {
+        const n = new Set(prev);
+        n.delete(song.id);
+        return n;
+      });
+    }
+  };
+
   // AI 解析审核：从歌曲管理页直接打开待审核任务
   const openReview = async (song: Song) => {
     setReviewSong(song);
     setReviewTask(null);
+    setReviewDraft(null);
+    setReviewNote('');
     setReviewLoading(true);
     try {
       const task = await aiParseApi.getTaskBySongId(song.id);
@@ -551,14 +674,28 @@ export default function Songs() {
     }
   };
 
-  const handleReview = async (action: 'approve' | 'reject') => {
+  const handleReview = async (action: 'approve' | 'reject' | 'modify') => {
     if (!reviewTask) return;
+    if (action === 'modify' && !reviewDraft) return;
     setReviewSubmitting(true);
     try {
-      await aiParseApi.review(reviewTask.id, { action });
-      showToast('success', action === 'approve' ? '已通过审核并应用' : '已拒绝该解析结果');
+      await aiParseApi.review(reviewTask.id, {
+        action,
+        modifiedResult: action === 'modify' ? reviewDraft! : undefined,
+        reviewNote: reviewNote.trim() || undefined,
+      });
+      showToast(
+        'success',
+        action === 'approve'
+          ? '已通过审核并应用'
+          : action === 'modify'
+            ? '已保存修改并应用'
+            : '已拒绝该解析结果',
+      );
       setReviewSong(null);
       setReviewTask(null);
+      setReviewDraft(null);
+      setReviewNote('');
       await fetchSongs({ showLoading: false });
     } catch (err) {
       showToast('error', err instanceof Error ? err.message : '审核操作失败');
@@ -602,6 +739,23 @@ export default function Songs() {
     } catch {
       snapshots.forEach((v, id) => patchSong(id, { separationStatus: v }));
       showToast('error', '批量分离提交失败');
+    }
+  };
+
+  const batchTranscode = async () => {
+    const videoSongs = selectedSongs.filter(s => isVideoType(s.fileType));
+    if (videoSongs.length === 0) {
+      showToast('warning', '选中的歌曲中没有视频文件');
+      return;
+    }
+    const snapshots = new Map(videoSongs.map((s) => [s.id, s.transcodeStatus]));
+    videoSongs.forEach((s) => patchSong(s.id, { transcodeStatus: 'pending' }));
+    try {
+      await Promise.all(videoSongs.map((s) => songsApi.transcode(s.id)));
+      showToast('success', `已提交 ${videoSongs.length} 首视频的转码任务`);
+    } catch {
+      snapshots.forEach((v, id) => patchSong(id, { transcodeStatus: v }));
+      showToast('error', '批量转码提交失败');
     }
   };
 
@@ -804,6 +958,14 @@ export default function Songs() {
           >
             批量分离
           </Button>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={batchTranscode}
+            leftIcon={<Film className="w-4 h-4" />}
+          >
+            批量转码
+          </Button>
         </div>
       )}
 
@@ -842,6 +1004,9 @@ export default function Songs() {
                   分离状态
                 </th>
                 <th className="text-left p-md text-sm font-body font-medium text-ink-2">
+                  转码状态
+                </th>
+                <th className="text-left p-md text-sm font-body font-medium text-ink-2">
                   分类
                 </th>
                 <th className="text-left p-md text-sm font-body font-medium text-ink-2">
@@ -852,13 +1017,13 @@ export default function Songs() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={9}>
+                  <td colSpan={10}>
                     <Loading />
                   </td>
                 </tr>
               ) : songs.length === 0 ? (
                 <tr>
-                  <td colSpan={9}>
+                  <td colSpan={10}>
                     <EmptyState
                       icon={<Music className="w-8 h-8" />}
                       title={hasActiveFilter ? '没有匹配的歌曲' : '暂无歌曲数据'}
@@ -872,8 +1037,9 @@ export default function Songs() {
                 </tr>
               ) : (
                 songs.map((song) => {
-                  const ai = aiParseBadge(song.aiParsed, song.aiNeedReview);
+                  const ai = aiParseBadge(song.aiParsed, song.aiNeedReview, song.aiManualEdited);
                   const sep = separationBadge(song.separationStatus);
+                  const tc = transcodeBadge(song.transcodeStatus);
                   const ft = fileTypeBadge(song.fileType);
                   const selected = selectedIds.has(song.id);
                   const busy = busyIds.has(song.id);
@@ -921,6 +1087,15 @@ export default function Songs() {
                         </Badge>
                       </td>
                       <td className="p-md">
+                        {isVideoType(song.fileType) ? (
+                          <Badge variant={tc.variant} dot>
+                            {tc.label}
+                          </Badge>
+                        ) : (
+                          <span className="text-xs text-ink-3">—</span>
+                        )}
+                      </td>
+                      <td className="p-md">
                         <div className="flex flex-wrap gap-1">
                           {(song.categories ?? []).length === 0 ? (
                             <span className="text-xs text-ink-3">—</span>
@@ -935,82 +1110,76 @@ export default function Songs() {
                       </td>
                       <td className="p-md">
                         <div className="flex items-center gap-1">
-                          <button
-                            onClick={() =>
-                              isVideoType(song.fileType)
-                                ? setVideoPreviewSong(song)
-                                : setPreviewSong(song)
-                            }
-                            disabled={busy}
-                            className="p-1.5 rounded-md text-ink-2 hover:text-accent hover:bg-paper-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent transition-colors disabled:opacity-50"
-                            aria-label={isVideoType(song.fileType) ? 'MV 预览' : '试听'}
-                            title={isVideoType(song.fileType) ? 'MV 预览' : '试听'}
-                          >
-                            {isVideoType(song.fileType) ? (
-                              <Film className="w-4 h-4" />
-                            ) : (
-                              <Headphones className="w-4 h-4" />
-                            )}
-                          </button>
-                          <button
-                            onClick={() => openEdit(song)}
-                            disabled={busy}
-                            className="p-1.5 rounded-md text-ink-2 hover:text-accent hover:bg-paper-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent transition-colors disabled:opacity-50"
-                            aria-label="编辑"
-                            title="编辑"
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => openLyrics(song)}
-                            disabled={busy}
-                            className={`p-1.5 rounded-md hover:bg-paper-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent transition-colors disabled:opacity-50 ${
-                              song.lyricsPath ? 'text-accent' : 'text-ink-2 hover:text-accent'
-                            }`}
-                            aria-label="歌词"
-                            title={song.lyricsPath ? '维护歌词' : '添加歌词'}
-                          >
-                            <FileText className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => performDelete([song])}
-                            disabled={busy}
-                            className="p-1.5 rounded-md text-ink-2 hover:text-danger hover:bg-paper-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent transition-colors disabled:opacity-50"
-                            aria-label="删除"
-                            title="删除"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => setPendingAiParse(song)}
-                            disabled={busy}
-                            className="p-1.5 rounded-md text-ink-2 hover:text-accent hover:bg-paper-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent transition-colors disabled:opacity-50"
-                            aria-label="AI 解析"
-                            title="AI 解析"
-                          >
-                            <Bot className="w-4 h-4" />
-                          </button>
-                          {song.aiParsed === 2 && song.aiNeedReview === 1 && (
+                            {/* 主要操作：试听 / 编辑 / 删除 */}
                             <button
-                              onClick={() => openReview(song)}
-                              disabled={busy || reviewLoading}
-                              className="p-1.5 rounded-md text-warning hover:text-warning hover:bg-paper-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent transition-colors disabled:opacity-50"
-                              aria-label="审核 AI 解析"
-                              title="审核 AI 解析"
+                              onClick={() =>
+                                isVideoType(song.fileType)
+                                  ? setVideoPreviewSong(song)
+                                  : setPreviewSong(song)
+                              }
+                              disabled={busy}
+                              className="p-1.5 rounded-md text-ink-2 hover:text-accent hover:bg-paper-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent transition-colors disabled:opacity-50"
+                              aria-label={isVideoType(song.fileType) ? 'MV 预览' : '试听'}
+                              title={isVideoType(song.fileType) ? 'MV 预览' : '试听'}
                             >
-                              <ClipboardCheck className="w-4 h-4" />
+                              {isVideoType(song.fileType) ? (
+                                <Film className="w-4 h-4" />
+                              ) : (
+                                <Headphones className="w-4 h-4" />
+                              )}
                             </button>
+                            <button
+                              onClick={() => openEdit(song)}
+                              disabled={busy}
+                              className="p-1.5 rounded-md text-ink-2 hover:text-accent hover:bg-paper-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent transition-colors disabled:opacity-50"
+                              aria-label="编辑"
+                              title="编辑"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => performDelete([song])}
+                              disabled={busy}
+                              className="p-1.5 rounded-md text-ink-2 hover:text-danger hover:bg-paper-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent transition-colors disabled:opacity-50"
+                              aria-label="删除"
+                              title="删除"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                            {/* 更多操作下拉 */}
+                            <button
+                              onClick={(e) => {
+                                const opening = openMenuId !== song.id;
+                                setOpenMenuId((prev) => (prev === song.id ? -1 : song.id));
+                                openMenuButtonRef.current = opening ? e.currentTarget : null;
+                              }}
+                              disabled={busy}
+                              className={`p-1.5 rounded-md hover:bg-paper-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent transition-colors disabled:opacity-50 ${
+                                openMenuId === song.id ? 'text-accent bg-paper-3' : 'text-ink-2 hover:text-accent'
+                              }`}
+                              aria-label="更多操作"
+                              aria-haspopup="menu"
+                              aria-expanded={openMenuId === song.id}
+                              title="更多操作"
+                            >
+                              <MoreVertical className="w-4 h-4" />
+                            </button>
+                          </div>
+
+                          {openMenuId === song.id && openMenuButtonRef.current && createPortal(
+                            <RowMoreMenu
+                              anchor={openMenuButtonRef.current}
+                              song={song}
+                              reviewLoading={reviewLoading}
+                              onClose={() => { setOpenMenuId(-1); openMenuButtonRef.current = null; }}
+                              onLyrics={() => { openLyrics(song); setOpenMenuId(-1); }}
+                              onAiParse={() => { setPendingAiParse(song); setOpenMenuId(-1); }}
+                              onReview={() => { openReview(song); setOpenMenuId(-1); }}
+                              onSeparation={() => { setPendingSeparation(song); setOpenMenuId(-1); }}
+                              onTranscode={() => { setPendingTranscode(song); setOpenMenuId(-1); }}
+                            />,
+                            document.body
                           )}
-                          <button
-                            onClick={() => setPendingSeparation(song)}
-                            disabled={busy}
-                            className="p-1.5 rounded-md text-ink-2 hover:text-accent hover:bg-paper-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent transition-colors disabled:opacity-50"
-                            aria-label="人声分离"
-                            title="人声分离"
-                          >
-                            <Mic className="w-4 h-4" />
-                          </button>
-                        </div>
                       </td>
                     </tr>
                   );
@@ -1256,6 +1425,24 @@ export default function Songs() {
         onCancel={() => setPendingSeparation(null)}
       />
 
+      {/* 单首 MV 转码确认弹窗 */}
+      <ConfirmModal
+        isOpen={!!pendingTranscode}
+        title="确认 MV 转码"
+        danger={false}
+        confirmLabel="开始转码"
+        message={
+          pendingTranscode ? (
+            <>
+              确定要对《<strong className="text-ink">{pendingTranscode.title}</strong>
+              》进行 MV 转码吗？若已转码过，将覆盖现有转码产物。
+            </>
+          ) : null
+        }
+        onConfirm={confirmTranscode}
+        onCancel={() => setPendingTranscode(null)}
+      />
+
       {previewSong && (
         <AudioPreviewModal
           isOpen={!!previewSong}
@@ -1276,72 +1463,316 @@ export default function Songs() {
         />
       )}
 
-      {/* AI 解析审核弹窗（歌曲管理页直接审核入口） */}
+      {/* AI 解析审核弹窗（歌曲管理页直接审核入口，支持在 AI 结果基础上人工干预后审核保存） */}
       <Modal
         isOpen={!!reviewSong}
-        onClose={() => { setReviewSong(null); setReviewTask(null); }}
+        onClose={() => {
+          setReviewSong(null);
+          setReviewTask(null);
+          setReviewDraft(null);
+          setReviewNote('');
+        }}
         title="审核 AI 解析结果"
       >
         {reviewLoading ? (
           <Loading />
         ) : reviewTask ? (
           <div className="space-y-md">
-            <p className="text-sm text-ink-3">
-              对比本地现有信息与 AI 识别建议，选择通过（应用 AI 结果）或拒绝（保留本地信息）。
-            </p>
-            <ReviewCompareRow
-              label="歌曲名"
-              current={reviewSong?.title || '—'}
-              suggested={String((safeParseJson(reviewTask.result)?.title) ?? '—')}
-            />
-            <ReviewCompareRow
-              label="歌手"
-              current={
-                reviewSong?.artistNames?.length
-                  ? reviewSong.artistNames.join('、')
-                  : (reviewSong?.artistName || '—')
-              }
-              suggested={(() => {
-                const p = safeParseJson(reviewTask.result);
-                if (!p) return '—';
-                const artists = Array.isArray(p.artists) ? p.artists : (p.artist ? [p.artist] : []);
-                return artists.length ? artists.join('、') : '—';
-              })()}
-            />
-            <ReviewCompareRow
-              label="专辑"
-              current="—"
-              suggested={String((safeParseJson(reviewTask.result)?.album) ?? '—')}
-            />
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-ink-3">置信度</span>
-              <span className="font-mono text-ink">
-                {reviewTask.confidence != null ? `${Math.round(reviewTask.confidence * 100)}%` : '—'}
-              </span>
+            {/* 源文件信息（文件名 + 目录路径） */}
+            {(() => {
+              const f = splitFilePath(reviewSong?.filePath);
+              return (
+                <div className="rounded-md bg-paper-2 px-3 py-2">
+                  <div className="flex items-start justify-between gap-md text-xs">
+                    <span className="text-ink-3 shrink-0 mt-0.5">源文件</span>
+                    <div className="min-w-0 text-right">
+                      <div className="text-ink font-mono break-all">{f.name}</div>
+                      {f.dir && (
+                        <div className="text-ink-3 font-mono text-[11px] break-all mt-0.5">{f.dir}</div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+            {reviewDraft ? (
+              <>
+                <p className="text-sm text-ink-3">
+                  在 AI 解析结果基础上修改，保存后应用人工修改结果并记录审核留痕。
+                </p>
+                <AiParseResultEditor value={reviewDraft} onChange={setReviewDraft} />
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-ink-3">
+                  对比本地现有信息与 AI 识别建议，选择通过（应用 AI 结果）、修改后应用或拒绝（保留本地信息）。
+                </p>
+                <ReviewCompareRow
+                  label="歌曲名"
+                  current={reviewSong?.title || '—'}
+                  suggested={String((safeParseJson(reviewTask.result)?.title) ?? '—')}
+                />
+                <ReviewCompareRow
+                  label="歌手"
+                  current={
+                    reviewSong?.artistNames?.length
+                      ? reviewSong.artistNames.join('、')
+                      : (reviewSong?.artistName || '—')
+                  }
+                  suggested={(() => {
+                    const p = safeParseJson(reviewTask.result);
+                    if (!p) return '—';
+                    const artists = Array.isArray(p.artists) ? p.artists : (p.artist ? [p.artist] : []);
+                    return artists.length ? artists.join('、') : '—';
+                  })()}
+                />
+                <ReviewCompareRow
+                  label="专辑"
+                  current="—"
+                  suggested={String((safeParseJson(reviewTask.result)?.album) ?? '—')}
+                />
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-ink-3">置信度</span>
+                  <span className="font-mono text-ink">
+                    {reviewTask.confidence != null ? `${Math.round(reviewTask.confidence * 100)}%` : '—'}
+                  </span>
+                </div>
+              </>
+            )}
+            <div>
+              <label className="block text-xs text-ink-3 mb-xs">审核备注（可选）</label>
+              <input
+                type="text"
+                className="w-full rounded-md border border-border bg-paper-2 text-sm text-ink px-3 py-1.5 focus-visible:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                placeholder="记录人工干预原因"
+                value={reviewNote}
+                onChange={(e) => setReviewNote(e.target.value)}
+              />
             </div>
             <div className="flex items-center gap-sm pt-sm">
-              <Button
-                variant="primary"
-                onClick={() => handleReview('approve')}
-                loading={reviewSubmitting}
-                className="flex-1"
-              >
-                通过并应用
-              </Button>
-              <Button
-                variant="ghost"
-                onClick={() => handleReview('reject')}
-                loading={reviewSubmitting}
-                className="flex-1"
-              >
-                拒绝
-              </Button>
+              {reviewDraft ? (
+                <>
+                  <Button
+                    variant="primary"
+                    onClick={() => handleReview('modify')}
+                    loading={reviewSubmitting}
+                    className="flex-1"
+                  >
+                    保存修改并应用
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    onClick={() => setReviewDraft(null)}
+                    disabled={reviewSubmitting}
+                    className="flex-1"
+                  >
+                    取消修改
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button
+                    variant="primary"
+                    onClick={() => handleReview('approve')}
+                    loading={reviewSubmitting}
+                    className="flex-1"
+                  >
+                    通过并应用
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      const parsed = safeParseJson(reviewTask.result);
+                      if (parsed) setReviewDraft({ ...parsed });
+                    }}
+                    disabled={reviewSubmitting}
+                    className="flex-1"
+                  >
+                    修改
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    onClick={() => handleReview('reject')}
+                    loading={reviewSubmitting}
+                    className="flex-1"
+                  >
+                    拒绝
+                  </Button>
+                </>
+              )}
             </div>
           </div>
         ) : null}
       </Modal>
 
       <ToastContainer />
+    </div>
+  );
+}
+
+// 「更多」操作下拉：通过 Portal 渲染到 body，使用 fixed 定位，
+// 彻底脱离表格 overflow-x-auto 容器，避免下拉撑出表格滚动条/抖动。
+function RowMoreMenu({
+  anchor,
+  song,
+  reviewLoading,
+  onClose,
+  onLyrics,
+  onAiParse,
+  onReview,
+  onSeparation,
+  onTranscode,
+}: {
+  anchor: HTMLElement;
+  song: Song;
+  reviewLoading: boolean;
+  onClose: () => void;
+  onLyrics: () => void;
+  onAiParse: () => void;
+  onReview: () => void;
+  onSeparation: () => void;
+  onTranscode: () => void;
+}) {
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const [pos, setPos] = useState<{ top: number; left: number }>(() => {
+    const rect = anchor.getBoundingClientRect();
+    return { top: rect.bottom + 4, left: rect.right - 160 };
+  });
+
+  // onClose 由父组件内联传入，用 ref 保存最新引用，避免 reposition 依赖变化导致监听反复重绑
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
+
+  // 根据锚点（触发按钮）当前视口位置计算菜单坐标：
+  // 锚点完全滚出视口（上下/左右任一方向）时关闭菜单，避免悬空贴在视口边缘；
+  // 垂直优先放按钮下方，空间不足翻转到上方；水平优先右对齐，右侧空间不足改左对齐。
+  const reposition = useCallback(() => {
+    const rect = anchor.getBoundingClientRect();
+    const menu = menuRef.current;
+    const menuW = menu?.offsetWidth ?? 160;
+    const menuH = menu?.offsetHeight ?? 176;
+    const margin = 8;
+
+    // 锚点完全滚出视口 → 触发按钮不可见，关闭菜单
+    if (
+      rect.bottom < 0 ||
+      rect.top > window.innerHeight ||
+      rect.right < 0 ||
+      rect.left > window.innerWidth
+    ) {
+      onCloseRef.current();
+      return;
+    }
+
+    // 水平
+    let left = rect.right - menuW;
+    if (left < margin) {
+      left = rect.left;
+      if (left + menuW > window.innerWidth - margin) {
+        left = window.innerWidth - menuW - margin;
+      }
+    }
+    left = Math.max(margin, left);
+
+    // 垂直
+    let top = rect.bottom + 4;
+    if (top + menuH > window.innerHeight - margin) {
+      top = rect.top - menuH - 4;
+    }
+    top = Math.max(margin, top);
+
+    setPos({ top, left });
+  }, [anchor]);
+
+  useLayoutEffect(() => {
+    reposition();
+  }, [reposition]);
+
+  // 滚动 / 缩放时跟随按钮重新定位（而不是关闭），保证不被遮挡
+  useEffect(() => {
+    window.addEventListener('scroll', reposition, true);
+    window.addEventListener('resize', reposition);
+    return () => {
+      window.removeEventListener('scroll', reposition, true);
+      window.removeEventListener('resize', reposition);
+    };
+  }, [reposition]);
+
+  // 点击外部关闭：菜单自身（Portal 中）与触发按钮均视为内部区域，
+  // 点菜单项时不会被误关，click 事件得以正常触发
+  useEffect(() => {
+    const onDocMouseDown = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (
+        menuRef.current &&
+        !menuRef.current.contains(t) &&
+        !anchor.contains(t)
+      ) {
+        onCloseRef.current();
+      }
+    };
+    document.addEventListener('mousedown', onDocMouseDown);
+    return () => {
+      document.removeEventListener('mousedown', onDocMouseDown);
+    };
+  }, [anchor]);
+
+  const itemCls =
+    'flex items-center gap-2 w-full px-3 py-2 text-sm text-left text-ink-2 hover:bg-paper-3 hover:text-accent focus-visible:outline-none focus-visible:bg-paper-3 transition-colors';
+
+  return (
+    <div
+      ref={menuRef}
+      role="menu"
+      style={{
+        position: 'fixed',
+        top: pos.top,
+        left: pos.left,
+        minWidth: 160,
+        zIndex: 50,
+      }}
+      className="bg-paper border border-border rounded-lg shadow-lg py-1"
+    >
+      <button
+        role="menuitem"
+        onClick={onLyrics}
+        className={`${itemCls} ${song.lyricsPath ? 'text-accent' : ''}`}
+      >
+        <FileText className="w-4 h-4" />
+        歌词
+      </button>
+      <button role="menuitem" onClick={onAiParse} className={itemCls}>
+        <Bot className="w-4 h-4" />
+        AI 解析
+      </button>
+      {song.aiParsed === 2 && song.aiNeedReview === 1 && (
+        <button
+          role="menuitem"
+          onClick={onReview}
+          disabled={reviewLoading}
+          className={`${itemCls} text-warning disabled:opacity-50`}
+        >
+          <ClipboardCheck className="w-4 h-4" />
+          审核 AI 解析
+        </button>
+      )}
+      <button role="menuitem" onClick={onSeparation} className={itemCls}>
+        <Mic className="w-4 h-4" />
+        人声分离
+      </button>
+      {isVideoType(song.fileType) && (
+        <button
+          role="menuitem"
+          onClick={onTranscode}
+          disabled={song.transcodeStatus === 'processing' || song.transcodeStatus === 'pending'}
+          className={`${itemCls} disabled:opacity-50`}
+        >
+          <Film className="w-4 h-4" />
+          MV 转码
+        </button>
+      )}
     </div>
   );
 }
