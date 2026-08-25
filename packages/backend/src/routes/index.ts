@@ -20,6 +20,7 @@ import logsRouter from './logs';
 import backupRouter from './backup';
 import dedupRouter from './dedup';
 import downloadRouter from './download';
+import lyricsRouter from './lyrics';
 
 const router = Router();
 
@@ -48,5 +49,6 @@ router.use('/system', systemRouter);
 router.use('/', backupRouter);
 router.use('/dedup', dedupRouter);
 router.use('/download', downloadRouter);
+router.use('/lyrics', lyricsRouter);
 
 export default router;

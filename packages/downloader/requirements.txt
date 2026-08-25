@@ -6,3 +6,5 @@ musicdl
 requests
 mutagen
 pycryptodome
+httpx[http2]
+pyaes

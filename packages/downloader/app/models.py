@@ -51,3 +51,24 @@ class ConfigRequest(BaseModel):
     enabled_sources: Optional[List[str]] = None
     # 下载并发上限；None 表示不修改
     concurrency: Optional[int] = None
+
+
+class LyricCandidateDescriptor(BaseModel):
+    key: str
+    source: str
+    source_label: str
+    title: str
+    artist: Optional[str] = None
+    album: Optional[str] = None
+    duration: Optional[str] = None
+    language: Optional[str] = None
+
+
+class LyricPreview(BaseModel):
+    search_id: str
+    source: str
+    index: int
+    title: str
+    artist: Optional[str] = None
+    album: Optional[str] = None
+    lrc: str

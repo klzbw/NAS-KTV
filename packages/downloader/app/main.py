@@ -87,6 +87,8 @@ logger.addHandler(memory_handler)
 from .models import (
     ConfigRequest,
     DownloadRequest,
+    LyricCandidateDescriptor,
+    LyricPreview,
     PlatformInfo,
     SearchRequest,
     SongDescriptor,
@@ -104,6 +106,13 @@ from .downloader import (
     get_cached_song,
     get_client,
     set_enabled_sources,
+)
+from .lyrics_service import (
+    LYRIC_API_REGISTRY,
+    get_cached_candidate,
+    get_lyrics_lrc_for_candidate,
+    get_lyrics_task,
+    submit_lyrics_search,
 )
 from .worker import worker
 
@@ -324,6 +333,89 @@ def cancel(task_id: str):
         raise HTTPException(status_code=404, detail='task not found or already terminal')
     logger.info('cancel ok task_id=%s', task_id)
     return {'task_id': task_id, 'status': 'cancelled'}
+
+
+# ---------------------------------------------------------------------------
+# 歌词搜索（LDDC 云端歌词）：搜索候选 -> 预览 LRC -> 由后端写盘覆盖 .lrc
+# ---------------------------------------------------------------------------
+@app.get('/api/lyrics/sources', response_model=list[PlatformInfo])
+def lyric_sources():
+    """可用歌词源列表（与下载平台同构，前端用于勾选）。"""
+    return [
+        PlatformInfo(key=key, id=key, label=label, enabled=True)
+        for key, (label, _cls) in LYRIC_API_REGISTRY.items()
+    ]
+
+
+@app.post('/api/lyrics/search')
+def lyrics_search(req: SearchRequest):
+    """提交异步歌词候选搜索，立即返回 search_id（结果经 GET /api/lyrics/search/{id} 轮询）。"""
+    if not req.keyword or not req.keyword.strip():
+        logger.warning('lyrics search rejected: empty keyword')
+        raise HTTPException(status_code=400, detail='keyword required')
+    keyword = req.keyword.strip()
+    search_id = submit_lyrics_search(keyword, req.sources)
+    return {'search_id': search_id, 'status': 'pending'}
+
+
+@app.get('/api/lyrics/search/{search_id}')
+def lyrics_search_result(search_id: str):
+    """轮询歌词候选：pending 返回空结果，done 返回 LyricCandidateDescriptor 列表。"""
+    task = get_lyrics_task(search_id)
+    if not task:
+        raise HTTPException(status_code=404, detail='lyrics search not found')
+    status = task['status']
+    if status != 'done':
+        return {
+            'search_id': search_id,
+            'status': status,
+            'keyword': task.get('keyword'),
+            'per_source': task.get('per_source'),
+            'errors': task.get('errors'),
+            'total': 0,
+            'results': [],
+        }
+    from .lyrics_service import LYRIC_SEARCH_CACHE, LYRIC_SEARCH_CACHE_LOCK
+
+    with LYRIC_SEARCH_CACHE_LOCK:
+        cached = dict(LYRIC_SEARCH_CACHE.get(search_id, {}))
+    results: list[LyricCandidateDescriptor] = []
+    for source_key, songs in cached.items():
+        label = LYRIC_API_REGISTRY.get(source_key, (source_key,))[0]
+        for idx, song in enumerate(songs):
+            results.append(
+                LyricCandidateDescriptor(
+                    key=f"{search_id}|{source_key}|{idx}",
+                    source=source_key,
+                    source_label=label,
+                    title=getattr(song, 'title', None) or '',
+                    artist=song.artist.str() if getattr(song, 'artist', None) else None,
+                    album=getattr(song, 'album', None),
+                    duration=song.format_duration if getattr(song, 'duration', None) else None,
+                    language=song.language.name if getattr(song, 'language', None) else None,
+                )
+            )
+    logger.info('[step=lyrics/result] search_id=%s total=%d', search_id, len(results))
+    return {
+        'search_id': search_id,
+        'status': 'done',
+        'keyword': task.get('keyword'),
+        'per_source': task.get('per_source'),
+        'errors': task.get('errors'),
+        'total': len(results),
+        'results': results,
+    }
+
+
+@app.get('/api/lyrics/preview/{search_id}/{source_key}/{index}', response_model=LyricPreview)
+def lyrics_preview(search_id: str, source_key: str, index: int):
+    """预览某候选的歌词 LRC 文本（落盘前的最后一次确认数据源）。"""
+    if source_key not in LYRIC_API_REGISTRY:
+        raise HTTPException(status_code=400, detail='unknown lyric source')
+    preview = get_lyrics_lrc_for_candidate(search_id, source_key, index)
+    if preview is None:
+        raise HTTPException(status_code=404, detail='lyrics not found for candidate')
+    return LyricPreview(**preview)
 
 
 @app.get('/api/logs')
