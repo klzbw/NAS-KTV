@@ -94,12 +94,12 @@ function SegmentBar({ segments }: { segments: { key: string; label: string; valu
           />
         ))}
       </div>
-      <div className="grid grid-cols-2 gap-xs text-xs text-ink-3">
+      <div className="flex flex-wrap justify-center gap-x-md gap-y-xs text-xs text-ink-3">
         {segments.map((item) => (
           <div key={item.key} className="flex items-center gap-1.5">
             <span className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color }} />
             <span className="truncate">{item.label}</span>
-            <span className="ml-auto font-mono text-ink">{item.value}</span>
+            <span className="font-mono text-ink">{item.value}</span>
           </div>
         ))}
       </div>
@@ -297,12 +297,12 @@ function DonutChart({ segments, size = 160, thickness = 16 }: { segments: { key:
           任务总量
         </text>
       </svg>
-      <div className="grid grid-cols-2 gap-x-md gap-y-xs text-xs text-ink-3">
+      <div className="flex flex-wrap justify-center gap-x-md gap-y-xs text-xs text-ink-3">
         {segments.map((item) => (
           <div key={item.key} className="flex items-center gap-1.5">
             <span className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color }} />
             <span className="truncate">{item.label}</span>
-            <span className="ml-auto font-mono text-ink">{item.value}</span>
+            <span className="font-mono text-ink">{item.value}</span>
           </div>
         ))}
       </div>
@@ -456,7 +456,7 @@ export default function Dashboard() {
           systemApi.getDashboard(),
           scanApi.history({ limit: 5, offset: 0 }),
           dedupApi.status().catch(() => null),
-          dedupApi.tasks(100).catch(() => []),
+          dedupApi.tasks({ page: 1, pageSize: 100 }).then((r) => r.items).catch(() => []),
           systemApi.getHealth().catch(() => null),
         ]);
         if (cancelled) return;
@@ -543,6 +543,29 @@ export default function Dashboard() {
     ];
   }, [stats]);
 
+  const transcodeSegments = useMemo(() => {
+    if (!stats) return [];
+    const { pending, processing, completed, failed } = stats.transcode;
+    return [
+      { key: 'pending', label: '排队中', value: pending, color: 'var(--color-ink-3)' },
+      { key: 'processing', label: '转码中', value: processing, color: 'var(--color-warning)' },
+      { key: 'completed', label: '已完成', value: completed, color: 'var(--color-success)' },
+      { key: 'failed', label: '失败', value: failed, color: 'var(--color-danger)' },
+    ];
+  }, [stats]);
+
+  // 任务类型分布：3 类任务的总量（用于 DonutChart），与右侧 SegmentBar 的「每类任务状态分布」互为视角互补
+  const taskTypeSegments = useMemo(() => {
+    if (!stats) return [];
+    const sum = (s: { pending: number; processing: number; completed: number; failed: number }) =>
+      s.pending + s.processing + s.completed + s.failed;
+    return [
+      { key: 'separation', label: '人声分离', value: sum(stats.separation), color: 'var(--color-accent)' },
+      { key: 'aiParse', label: 'AI 解析', value: sum(stats.aiParse), color: 'var(--color-info)' },
+      { key: 'transcode', label: 'MV 转码', value: sum(stats.transcode), color: 'var(--color-warning)' },
+    ];
+  }, [stats]);
+
   const metadataSegments = useMemo(() => {
     if (!stats) return [];
     return [
@@ -594,7 +617,7 @@ export default function Dashboard() {
       systemApi.getDashboard(),
       scanApi.history({ limit: 5, offset: 0 }),
       dedupApi.status().catch(() => null),
-      dedupApi.tasks(100).catch(() => []),
+      dedupApi.tasks({ page: 1, pageSize: 100 }).then((r) => r.items).catch(() => []),
       systemApi.getHealth().catch(() => null),
     ])
       .then(([d, s, ds, dt, h]) => {
@@ -765,14 +788,22 @@ export default function Dashboard() {
           <section className="grid grid-cols-1 xl:grid-cols-3 gap-md animate-hall-in-delay-2">
             <div className="xl:col-span-2 bg-paper-2 border border-border rounded-lg p-lg">
               <h2 className="text-lg font-display font-semibold text-ink mb-md">任务处理状态</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-lg">
-                <DonutChart segments={separationSegments} />
+              <div className="flex flex-col md:flex-row items-center justify-center gap-xl">
+                <div>
+                  <DonutChart segments={taskTypeSegments} />
+                  <div className="text-xs text-ink-3 mt-sm text-center">按任务类型分布</div>
+                </div>
                 <div className="space-y-md">
                   <div className="text-sm text-ink-2">人声分离队列</div>
                   <SegmentBar segments={separationSegments} />
                   <div className="text-sm text-ink-2">AI 解析队列</div>
                   <SegmentBar segments={aiSegments} />
-                  <div className="text-xs text-ink-3">正在分离 {stats.separation.processing} 项，正在 AI 解析 {stats.aiParse.processing} 项。</div>
+                  <div className="text-sm text-ink-2">MV 转码队列</div>
+                  <SegmentBar segments={transcodeSegments} />
+                  <div className="text-xs text-ink-3">
+                    正在分离 {stats.separation.processing} 项，正在 AI 解析 {stats.aiParse.processing} 项，正在转码{' '}
+                    {stats.transcode.processing} 项。
+                  </div>
                 </div>
               </div>
             </div>
@@ -812,7 +843,7 @@ export default function Dashboard() {
                   <span className="text-sm">暂无扫描记录</span>
                 </div>
               ) : (
-                <ul className="divide-y divide-border">
+                <ul className="divide-y divide-border max-h-[320px] lg:max-h-[400px] overflow-y-auto pr-1">
                   {scanTasks.map((task) => {
                     const statusInfo = SCAN_STATUS_MAP[task.status] ?? { variant: 'neutral' as BadgeVariant, label: task.status };
                     const newSongs = getNewSongs(task.result);

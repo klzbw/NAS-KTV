@@ -49,9 +49,18 @@ export const dedupApi = {
     client
       .get<ApiResponse<{ progress: DedupProgress; lastResult: DedupResult | null }>>('/dedup/status')
       .then((res) => res.data.data),
-  tasks: (limit = 20): Promise<DedupTaskItem[]> =>
+  tasks: (
+    params?: { page?: number; pageSize?: number },
+  ): Promise<{ items: DedupTaskItem[]; total: number; page: number; limit: number; offset: number }> =>
     client
-      .get<ApiResponse<DedupTaskItem[]>>('/dedup/tasks', { params: { limit } })
+      .get<ApiResponse<{ items: DedupTaskItem[]; total: number; page: number; limit: number; offset: number }>>(
+        '/dedup/tasks',
+        { params },
+      )
+      .then((res) => res.data.data),
+  task: (id: number): Promise<DedupTaskItem> =>
+    client
+      .get<ApiResponse<DedupTaskItem>>(`/dedup/tasks/${id}`)
       .then((res) => res.data.data),
   restore: (taskId: number, removedId: number): Promise<{ songId: number | null; restored: boolean }> =>
     client

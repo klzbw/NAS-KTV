@@ -2,13 +2,14 @@
  * states: default · hover · focus-visible · active · disabled · loading · error · success
  * 去重开关控制 + 任务列表 + 结果详情 + 手动还原
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { RotateCcw, Clock, CopyX, Eye } from 'lucide-react';
 import Button from '../components/Button';
 import EmptyState from '../components/EmptyState';
 import Badge from '../components/Badge';
 import Modal from '../components/Modal';
+import Pagination from '../components/Pagination';
 import {
   dedupApi,
   type DedupResult,
@@ -130,19 +131,25 @@ export default function Dedup() {
   });
   const [dedupResult, setDedupResult] = useState<DedupResult | null>(null);
   const [dedupTasks, setDedupTasks] = useState<DedupTaskItem[]>([]);
-  const [selectedTaskId, setSelectedTaskId] = useState<number | null>(
-    focusTaskId ? Number(focusTaskId) || null : null,
-  );
+  const [taskTotal, setTaskTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  // 详情弹窗当前展示的任务（可能来自当前页，也可能来自 URL 跳转的任意任务）
+  const [selectedTask, setSelectedTask] = useState<DedupTaskItem | null>(null);
   const [restoringId, setRestoringId] = useState<number | null>(null);
 
-  const loadDedupTasks = useCallback(async () => {
-    try {
-      const tasks = await dedupApi.tasks(20);
-      setDedupTasks(tasks);
-    } catch {
-      // 任务列表读取失败不阻塞页面
-    }
-  }, []);
+  const loadDedupTasks = useCallback(
+    async (targetPage = page, targetPageSize = pageSize) => {
+      try {
+        const data = await dedupApi.tasks({ page: targetPage, pageSize: targetPageSize });
+        setDedupTasks(data.items);
+        setTaskTotal(data.total);
+      } catch {
+        // 任务列表读取失败不阻塞页面
+      }
+    },
+    [page, pageSize],
+  );
 
   // 加载开关配置 + 去重状态 + 任务记录
   useEffect(() => {
@@ -172,12 +179,40 @@ export default function Dedup() {
     loadDedupTasks();
   }, [loadDedupTasks]);
 
-  // 从扫描页跳转：自动打开指定任务
+  // 从扫描页跳转：自动打开指定任务（任务可能不在当前分页，需单独拉取）
+  const focusedTaskRef = useRef<number | null>(null);
   useEffect(() => {
-    if (focusTaskId) {
-      setSelectedTaskId(Number(focusTaskId) || null);
+    if (!focusTaskId) return;
+    const targetId = Number(focusTaskId) || null;
+    if (targetId === null || focusedTaskRef.current === targetId) return;
+    focusedTaskRef.current = targetId;
+    const local = dedupTasks.find((t) => t.id === targetId);
+    if (local) {
+      setSelectedTask(local);
+      return;
     }
-  }, [focusTaskId]);
+    dedupApi
+      .task(targetId)
+      .then((detail) => setSelectedTask(detail))
+      .catch(() => {
+        // 任务不存在时忽略（例如已被删除）
+      });
+  }, [focusTaskId, dedupTasks]);
+
+  // 打开任务详情：当前页命中直接用，否则单独拉取（URL 跳转/跨页场景）
+  const openTaskDetail = async (taskId: number) => {
+    const local = dedupTasks.find((t) => t.id === taskId);
+    if (local) {
+      setSelectedTask(local);
+      return;
+    }
+    try {
+      const detail = await dedupApi.task(taskId);
+      setSelectedTask(detail);
+    } catch {
+      showToast('error', '加载任务详情失败');
+    }
+  };
 
   const toggleAiDedup = (v: boolean) => {
     setAiDedup(v);
@@ -210,7 +245,9 @@ export default function Dedup() {
           window.clearInterval(timer);
           setDedupRunning(false);
           setDedupResult(s.lastResult);
-          loadDedupTasks();
+          // 去重完成：回到第一页展示最新任务记录
+          setPage(1);
+          loadDedupTasks(1, pageSize);
           if (s.lastResult) {
             showToast(
               'success',
@@ -243,7 +280,7 @@ export default function Dedup() {
     }
   };
 
-  const selectedTask = dedupTasks.find((t) => t.id === selectedTaskId) ?? null;
+  const totalPages = Math.max(1, Math.ceil(taskTotal / pageSize));
 
   return (
     <>
@@ -350,7 +387,7 @@ export default function Dedup() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => setSelectedTaskId(task.id)}
+                      onClick={() => openTaskDetail(task.id)}
                       leftIcon={<Eye className="w-3.5 h-3.5" aria-hidden="true" />}
                     >
                       详情
@@ -360,6 +397,25 @@ export default function Dedup() {
               </div>
             ))}
           </div>
+
+          {taskTotal > 0 && (
+            <div className="px-md py-sm border-t border-border">
+              <Pagination
+                currentPage={page}
+                totalPages={totalPages}
+                onPageChange={(p) => {
+                  setPage(p);
+                  loadDedupTasks(p, pageSize);
+                }}
+                pageSize={pageSize}
+                onPageSizeChange={(s) => {
+                  setPageSize(s);
+                  setPage(1);
+                  loadDedupTasks(1, s);
+                }}
+              />
+            </div>
+          )}
         </div>
 
         <ToastContainer />
@@ -368,7 +424,7 @@ export default function Dedup() {
       {/* 去重任务详情弹窗 */}
       <Modal
         isOpen={selectedTask !== null}
-        onClose={() => setSelectedTaskId(null)}
+        onClose={() => setSelectedTask(null)}
         title="去重任务详情"
         size="lg"
       >

@@ -4,6 +4,7 @@ import {
   runLocalDedup,
   getDedupStatus,
   getDedupTasks,
+  getDedupTaskById,
   restoreSong,
 } from '../services/dedup-service';
 
@@ -27,11 +28,38 @@ router.get('/status', authenticateToken, (req: Request, res: Response) => {
 });
 
 /**
- * GET /api/dedup/tasks - 去重任务记录
+ * GET /api/dedup/tasks - 去重任务记录（分页）
  */
 router.get('/tasks', authenticateToken, (req: Request, res: Response) => {
-  const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
-  res.json({ success: true, data: getDedupTasks(limit) });
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize) || 10));
+  const offset = (page - 1) * pageSize;
+  const data = getDedupTasks({ offset, limit: pageSize });
+  res.json({
+    success: true,
+    data: {
+      items: data.items,
+      total: data.total,
+      page,
+      limit: pageSize,
+      offset,
+    },
+  });
+});
+
+/**
+ * GET /api/dedup/tasks/:id - 单个去重任务（详情弹窗 / 扫描页 URL 跳转，任务可能不在当前分页）
+ */
+router.get('/tasks/:id', authenticateToken, (req: Request, res: Response) => {
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) {
+    return res.status(400).json({ success: false, message: '参数无效' });
+  }
+  const task = getDedupTaskById(id);
+  if (!task) {
+    return res.status(404).json({ success: false, message: '任务不存在' });
+  }
+  res.json({ success: true, data: task });
 });
 
 /**

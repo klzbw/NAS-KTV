@@ -262,7 +262,7 @@ export default function Scan() {
   // 加载去重任务（scanId → 任务映射，供历史列表关联展示）
   const loadDedupTasks = useCallback(async () => {
     try {
-      const tasks = await dedupApi.tasks(50);
+      const tasks = await dedupApi.tasks({ page: 1, pageSize: 50 }).then((r) => r.items);
       const map: Record<string, DedupTaskItem> = {};
       for (const t of tasks) {
         if (t.scanId) map[t.scanId] = t;
