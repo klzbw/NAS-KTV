@@ -116,7 +116,7 @@ const css = `
 }
 `;
 
-export default function Lyrics({ lines, currentIndex, currentTime = 0 }: LyricsProps) {
+export default function Lyrics({ lines, currentIndex, currentTime = 0, playing = false }: LyricsProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const safeLines = Array.isArray(lines) ? lines : [];
 
@@ -138,17 +138,22 @@ export default function Lyrics({ lines, currentIndex, currentTime = 0 }: LyricsP
   }, [currentIndex]);
 
   // 逐字填充：rAF 直写当前行词 span 的 --p CSS 变量，绕开 React 渲染
-  // （避免每帧重渲整列歌词）。currentTime 由父组件按 TV 广播节拍更新，
-  // 本地以锚点 + performance.now() 插值，消除广播跳变导致的逐字卡顿。
+  // （避免每帧重渲整列歌词）。currentTime 由父组件按 TV 广播节拍更新（1Hz），
+  // 锚点更新放函数体（每次渲染 currentTime 真正变化时刷新）而非 useEffect，
+  // 避免 deps 浅比较未变时锚点 ts 停在过去。
+  // 插值/冻结判定：playing 优先，暂停冻结；广播/卡顿超过 5s 兜底冻结防止漂移。
   const propsRef = useRef({ currentIndex, currentTime });
   propsRef.current = { currentIndex, currentTime };
+  const playingRef = useRef(playing ?? false);
+  playingRef.current = playing ?? false;
   const anchorRef = useRef({ t: currentTime, ts: performance.now() });
-  const frozenRef = useRef(true);
+  const lastTimeRef = useRef(currentTime);
 
-  useEffect(() => {
-    anchorRef.current = { t: currentTime, ts: performance.now() };
-    frozenRef.current = false;
-  }, [currentTime, currentIndex]);
+  const newTime = currentTime;
+  if (newTime !== lastTimeRef.current) {
+    lastTimeRef.current = newTime;
+    anchorRef.current = { t: newTime, ts: performance.now() };
+  }
 
   useEffect(() => {
     let raf = 0;
@@ -157,13 +162,11 @@ export default function Lyrics({ lines, currentIndex, currentTime = 0 }: LyricsP
       const { currentIndex: idx } = propsRef.current;
       if (idx < 0) return;
       const now = performance.now();
-      // 超过 400ms 未收到新的 currentTime（暂停 / seek）则冻结插值
-      if (now - anchorRef.current.ts > 400) {
-        frozenRef.current = true;
-      }
-      const t = frozenRef.current
-        ? anchorRef.current.t
-        : anchorRef.current.t + (now - anchorRef.current.ts) / 1000;
+      const elapsed = (now - anchorRef.current.ts) / 1000;
+      const t =
+        !playingRef.current || elapsed > 5
+          ? anchorRef.current.t
+          : anchorRef.current.t + elapsed;
 
       const spans =
         containerRef.current?.querySelectorAll(

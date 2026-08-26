@@ -12,6 +12,8 @@ interface LyricsDisplayProps {
   currentTime: number;
   duration?: number;
   lyricOffsetMs?: number;
+  /** 播放中：rAF 以锚点 + performance.now() 插值；暂停时冻结在锚点，避免漂移 */
+  isPlaying?: boolean;
 }
 
 const css = `
@@ -199,7 +201,7 @@ function LyricSlot({
   );
 }
 
-export default function LyricsDisplay({ lines, currentIndex, currentTime, duration = 0, lyricOffsetMs = 0 }: LyricsDisplayProps) {
+export default function LyricsDisplay({ lines, currentIndex, currentTime, duration = 0, lyricOffsetMs = 0, isPlaying = true }: LyricsDisplayProps) {
   const [slot0Text, setSlot0Text] = useState('');
   const [slot1Text, setSlot1Text] = useState('');
   const [slot0Words, setSlot0Words] = useState<LyricWord[] | undefined>(undefined);
@@ -284,15 +286,20 @@ export default function LyricsDisplay({ lines, currentIndex, currentTime, durati
   }, [lines, currentIndex, currentTime, lyricOffsetMs]);
 
   // 逐字 rAF tick：按当前播放时间计算每词 --p（已唱进度），直写 CSS 变量。
-  // 使用「锚点 + 插值」模式：currentTime 每次广播刷新锚点，rAF 在帧间用
-  // performance.now() 平滑推进；暂停/seek 时（>400ms 未刷新）冻结插值。
-  const anchorRef = useRef({ t: currentTime + lyricOffsetMs / 1000, ts: 0 });
-  const frozenRef = useRef(true);
+  // 锚点更新放在函数体（每次渲染 currentTime 真正变化时刷新），不依赖 useEffect
+  // 的浅比较：避免「timeupdate 节流命中 0.2s 临界值导致 setCurrentTime 不触发」
+  // 或「props 浅比较未变」时锚点 ts 停在过去、冻结误命中、字高亮卡死。
+  // 插值/冻结判定：播放中以锚点 + 经过时间插值；暂停冻结；广播/卡顿兜底（5s）冻结。
+  const anchorRef = useRef({ t: currentTime + lyricOffsetMs / 1000, ts: performance.now() });
+  const lastTimeRef = useRef(currentTime + lyricOffsetMs / 1000);
+  const playingRef = useRef(isPlaying);
+  playingRef.current = isPlaying;
 
-  useEffect(() => {
-    anchorRef.current = { t: currentTime + lyricOffsetMs / 1000, ts: performance.now() };
-    frozenRef.current = false;
-  }, [currentTime, currentIndex, lyricOffsetMs]);
+  const newTime = currentTime + lyricOffsetMs / 1000;
+  if (newTime !== lastTimeRef.current) {
+    lastTimeRef.current = newTime;
+    anchorRef.current = { t: newTime, ts: performance.now() };
+  }
 
   useEffect(() => {
     let raf = 0;
@@ -301,12 +308,13 @@ export default function LyricsDisplay({ lines, currentIndex, currentTime, durati
       const container = containerRef.current;
       if (!container) return;
       const now = performance.now();
-      if (now - anchorRef.current.ts > 400) {
-        frozenRef.current = true;
-      }
-      const t = frozenRef.current
-        ? anchorRef.current.t
-        : anchorRef.current.t + (now - anchorRef.current.ts) / 1000;
+      const elapsed = (now - anchorRef.current.ts) / 1000;
+      // 暂停或广播/卡顿超过 5s 未更新：冻结在锚点（防止漂移、防止视觉跑飞）
+      // 正常播放：以锚点 + 经过时间插值（rAF 平滑推进）
+      const t =
+        !playingRef.current || elapsed > 5
+          ? anchorRef.current.t
+          : anchorRef.current.t + elapsed;
 
       const wordEls = container.querySelectorAll(
         '.lyrics-slot.current .lyric-word',

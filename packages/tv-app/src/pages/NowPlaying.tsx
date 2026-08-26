@@ -656,6 +656,7 @@ export default function NowPlaying() {
               currentTime={currentTime}
               duration={duration}
               lyricOffsetMs={lyricOffsetMs}
+              isPlaying={isPlaying}
             />
           )}
         </>
