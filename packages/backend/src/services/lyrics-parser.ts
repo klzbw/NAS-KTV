@@ -62,7 +62,9 @@ function tagToSeconds(mm: string, ss: string, frac?: string): number {
  * 返回逐字数组（start/end 为绝对秒），无字标签时返回 null。
  */
 function parseWordTiming(textWithTags: string): LyricWord[] | null {
-  const TAG = /<(\d{1,2}):(\d{1,2})(?:\.\d{1,3})?>/g;
+  // 字级标签正则：内层 (\.\d{1,3}) 必须为捕获组，m[3] 才能取到百分秒小数，
+  // 否则 tagToSeconds 的 frac 恒为 undefined、字时间戳被截断成整数秒。
+  const TAG = /<(\d{1,2}):(\d{1,2})(?:\.(\d{1,3}))?>/g;
   const tags: { time: number; start: number; end: number }[] = [];
   let m: RegExpExecArray | null;
   while ((m = TAG.exec(textWithTags)) !== null) {
