@@ -13,6 +13,7 @@ import client, { setApiBaseUrl } from './api/client';
 import { loadBackendConfig } from './lib/backend-config';
 import { useConfigStore } from './stores/config';
 import { useRoomSync } from './hooks/useRoomSync';
+import { micVolumeService } from './services/micVolume';
 import ExpiringBanner from './components/ExpiringBanner';
 import ConnectionBanner from './components/ConnectionBanner';
 import { AlertCircle, RefreshCw } from 'lucide-react';
@@ -45,6 +46,8 @@ function App() {
     if (!IS_TAURI) return;
     invoke('start_discovery').catch(() => {});
     invoke('start_config_server').catch(() => {});
+    // 麦克风音量控制接口：注册 H5→TV 命令监听与连接后状态补发（幂等）
+    micVolumeService.init();
   }, []);
 
   // 防重入锁：避免同一次 effect 内并发 bootstrap（如快速重渲染）。

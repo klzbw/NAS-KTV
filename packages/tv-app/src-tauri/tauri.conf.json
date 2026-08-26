@@ -37,7 +37,10 @@
       "icons/icon.ico"
     ],
     "android": {
-      "minSdkVersion": 24
+      "minSdkVersion": 24,
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     }
   }
 }
