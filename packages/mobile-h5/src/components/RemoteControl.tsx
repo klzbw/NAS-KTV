@@ -11,9 +11,9 @@ import { useRoomStore } from '../stores/room';
 import { queueApi } from '../api/queue';
 import Lyrics from './Lyrics';
 import ProgressBar from './ProgressBar';
-import { sendPlayerCommand, sendLyricOffset } from '../hooks/usePlayerCommand';
+import { sendPlayerCommand, sendLyricOffset, sendMicVolumeCommand } from '../hooks/usePlayerCommand';
 import { wsClient } from '../ws/client';
-import { WsMessageType, type LyricOffsetPayload, type PlayerCommandPayload } from '@nasktv/shared';
+import { WsMessageType, type LyricOffsetPayload, type PlayerCommandPayload, type MicVolumeStatePayload } from '@nasktv/shared';
 import client from '../api/client';
 import {
   Disc3,
@@ -26,6 +26,8 @@ import {
   Minus,
   Plus,
   Volume2,
+  VolumeX,
+  Mic,
   Timer,
   Undo2,
   X,
@@ -621,6 +623,8 @@ export default function RemoteControl() {
   const {
     currentItem,
     playerState,
+    micVolume,
+    setMicVolume,
     currentLyricIndex,
     remoteOpen,
     openRemote,
@@ -879,6 +883,37 @@ export default function RemoteControl() {
   const handleLyricOffsetReset = useCallback(() => {
     sendLyricOffset(0);
   }, []);
+
+  // ===== 麦克风采集音量控制 =====
+  // TV 端为权威来源：H5 发送命令后乐观更新本地显示，再以 TV 广播的 MIC_VOLUME_STATE 为准校正。
+  const micState = micVolume;
+  const micReady = micState != null;
+  const micVolumeValue = micState?.volume ?? 0;
+  const micMuted = micState?.muted ?? false;
+  const micSupported = micState?.supported ?? false;
+
+  // 乐观更新：基于当前 store 值计算并立即渲染，避免 WS 往返期间 UI 无响应
+  const applyMicOptimistic = useCallback((next: Partial<MicVolumeStatePayload>) => {
+    const base: MicVolumeStatePayload = micVolume ?? {
+      volume: 0,
+      muted: false,
+      supported: true,
+      timestamp: Date.now(),
+    };
+    setMicVolume({ ...base, ...next, timestamp: Date.now() });
+  }, [micVolume, setMicVolume]);
+
+  // 增减（相对命令，与伴奏/人声音量一致：基于 TV 广播值累加，避免多手机同时点击丢更新）
+  const handleMicAdjust = useCallback((delta: number) => {
+    applyMicOptimistic({ volume: Math.max(0, Math.min(1, micVolumeValue + delta)) });
+    sendMicVolumeCommand({ command: 'adjust', value: delta });
+  }, [micVolumeValue, applyMicOptimistic]);
+
+  // 静音切换
+  const handleMicToggleMute = useCallback(() => {
+    applyMicOptimistic({ muted: !micMuted });
+    sendMicVolumeCommand({ command: 'toggle_mute' });
+  }, [micMuted, applyMicOptimistic]);
 
   const lyricOffsetLabel =
     lyricOffsetMs === 0
@@ -1248,6 +1283,64 @@ export default function RemoteControl() {
                         </button>
                       </div>
                     </div>
+                  )}
+
+                  {/* 麦克风采集音量：TV 端为权威来源，H5 仅下发命令并同步显示。
+                      未就绪/不支持时禁用（TV 未授权或无麦克风设备）。 */}
+                  <div className="np-tune-row" style={{ marginTop: 'var(--space-md)' }}>
+                    <div className="np-tune-group">
+                      <Mic size={16} strokeWidth={1.8} className="text-ink-3" />
+                      <span className="np-tune-label">麦克风</span>
+                      <button
+                        onClick={() => handleMicAdjust(-0.1)}
+                        className="np-btn np-btn--small"
+                        aria-label="降低麦克风音量"
+                        disabled={!micReady || !micSupported || micMuted || micVolumeValue <= 0}
+                        tabIndex={0}
+                        role="button"
+                        type="button"
+                      >
+                        <Minus size={18} strokeWidth={1.8} />
+                      </button>
+                      <span className="np-tune-value">
+                        {!micReady ? '—' : micMuted ? '静音' : `${Math.round(micVolumeValue * 100)}%`}
+                      </span>
+                      <button
+                        onClick={() => handleMicAdjust(0.1)}
+                        className="np-btn np-btn--small"
+                        aria-label="提高麦克风音量"
+                        disabled={!micReady || !micSupported || micMuted || micVolumeValue >= 1}
+                        tabIndex={0}
+                        role="button"
+                        type="button"
+                      >
+                        <Plus size={18} strokeWidth={1.8} />
+                      </button>
+                      <button
+                        onClick={handleMicToggleMute}
+                        className="np-btn np-btn--small"
+                        aria-label={micMuted ? '取消静音' : '静音'}
+                        aria-pressed={micMuted}
+                        disabled={!micReady || !micSupported}
+                        tabIndex={0}
+                        role="button"
+                        type="button"
+                      >
+                        {micMuted ? (
+                          <VolumeX size={18} strokeWidth={1.8} />
+                        ) : (
+                          <Mic size={18} strokeWidth={1.8} />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                  {micReady && !micSupported && (
+                    <p
+                      className="text-ink-3"
+                      style={{ fontSize: '12px', textAlign: 'center', marginTop: 'var(--space-xs)' }}
+                    >
+                      麦克风不可用（电视端未授权或无麦克风设备）
+                    </p>
                   )}
                 </div>
               </section>

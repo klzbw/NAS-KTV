@@ -11,11 +11,12 @@ import {
   type LyricSyncPayload,
   type RoomUnauthorizedPayload,
   type RoomClosedPayload,
+  type MicVolumeStatePayload,
 } from '@nasktv/shared';
 
 export function useRoomSync() {
   const { roomCode, sessionToken, sessionExpiresAt, leave, setUnauthorized } = useRoomStore();
-  const { setQueue, setCurrentItem, setPlayerState, setCurrentLyricIndex } = useQueueStore();
+  const { setQueue, setCurrentItem, setPlayerState, setMicVolume, setCurrentLyricIndex } = useQueueStore();
   // 服务端按房间分配的队列版本；快照与实时广播共用该基线，避免乱序覆盖。
   const lastQueueVersionRef = useRef(0);
   // 最近处理的播放状态版本号：由服务端单调递增分配。
@@ -107,6 +108,18 @@ export function useRoomSync() {
       setCurrentLyricIndex(payload.lineIndex);
     });
 
+    // 监听麦克风音量状态（TV 端推送，权威来源）：同步到 store 供遥控器显示
+    const unsubMic = wsClient.on(WsMessageType.MIC_VOLUME_STATE, (msg) => {
+      const payload = (msg.payload ?? {}) as MicVolumeStatePayload;
+      if (typeof payload.volume !== 'number' || typeof payload.muted !== 'boolean') return;
+      setMicVolume({
+        volume: Math.max(0, Math.min(1, Number(payload.volume) || 0)),
+        muted: !!payload.muted,
+        supported: payload.supported !== false,
+        timestamp: Number(payload.timestamp) || Date.now(),
+      });
+    });
+
     // 监听房间关闭 → 回到加入页（带原因提示）
     const unsubClosed = wsClient.on(WsMessageType.ROOM_CLOSED, msg => {
       const payload = msg.payload as RoomClosedPayload;
@@ -146,9 +159,10 @@ export function useRoomSync() {
       unsubQueue();
       unsubPlayer();
       unsubLyric();
+      unsubMic();
       unsubClosed();
       unsubUnauth();
       wsClient.disconnect();
     };
-  }, [roomCode, sessionToken, setQueue, setCurrentItem, setPlayerState, setCurrentLyricIndex, leave, setUnauthorized]);
+  }, [roomCode, sessionToken, setQueue, setCurrentItem, setPlayerState, setMicVolume, setCurrentLyricIndex, leave, setUnauthorized]);
 }
