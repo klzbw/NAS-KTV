@@ -1286,7 +1286,8 @@ export default function RemoteControl() {
                   )}
 
                   {/* 麦克风采集音量：TV 端为权威来源，H5 仅下发命令并同步显示。
-                      未就绪/不支持时禁用（TV 未授权或无麦克风设备）。 */}
+                      调节按钮始终可用——音量数值与麦克风采集链路解耦；supported=false
+                      仅作提示徽标（电视端未授权/无麦克风设备，调整后于设备就绪后生效）。 */}
                   <div className="np-tune-row" style={{ marginTop: 'var(--space-md)' }}>
                     <div className="np-tune-group">
                       <Mic size={16} strokeWidth={1.8} className="text-ink-3" />
@@ -1295,7 +1296,7 @@ export default function RemoteControl() {
                         onClick={() => handleMicAdjust(-0.1)}
                         className="np-btn np-btn--small"
                         aria-label="降低麦克风音量"
-                        disabled={!micReady || !micSupported || micMuted || micVolumeValue <= 0}
+                        disabled={micMuted || micVolumeValue <= 0}
                         tabIndex={0}
                         role="button"
                         type="button"
@@ -1309,7 +1310,7 @@ export default function RemoteControl() {
                         onClick={() => handleMicAdjust(0.1)}
                         className="np-btn np-btn--small"
                         aria-label="提高麦克风音量"
-                        disabled={!micReady || !micSupported || micMuted || micVolumeValue >= 1}
+                        disabled={micMuted || micVolumeValue >= 1}
                         tabIndex={0}
                         role="button"
                         type="button"
@@ -1321,7 +1322,6 @@ export default function RemoteControl() {
                         className="np-btn np-btn--small"
                         aria-label={micMuted ? '取消静音' : '静音'}
                         aria-pressed={micMuted}
-                        disabled={!micReady || !micSupported}
                         tabIndex={0}
                         role="button"
                         type="button"
