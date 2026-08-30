@@ -10,3 +10,14 @@ export const SEPARATION_MODELS: { value: SeparationModel; label: string; hint: s
 
 export const separationModelLabel = (value?: string | null) =>
   SEPARATION_MODELS.find(m => m.value === value)?.label ?? value ?? '—';
+
+export type TranscodeProfile = 'compatible' | 'standard' | 'high';
+
+export const TRANSCODE_PROFILES: { value: TranscodeProfile; label: string; hint: string }[] = [
+  { value: 'compatible', label: '兼容优先（480p）', hint: '854x480 / 视频 1200k / 音频 128k，最省空间、兼容性最广' },
+  { value: 'standard', label: '标准（720p）', hint: '1280x720 / 视频 2500k / 音频 192k，推荐默认' },
+  { value: 'high', label: '高清（1080p）', hint: '1920x1080 / 视频 5000k / 音频 256k，画质最佳、体积最大' },
+];
+
+export const transcodeProfileLabel = (value?: string | null) =>
+  TRANSCODE_PROFILES.find(m => m.value === value)?.label ?? value ?? '—';

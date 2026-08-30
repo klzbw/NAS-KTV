@@ -18,6 +18,8 @@ interface PaginationProps {
   onPageSizeChange?: (size: number) => void;
   /** 可选每页条数，默认 [10, 20, 50, 100] */
   pageSizeOptions?: number[];
+  /** 总条目数；提供后在左侧渲染统一的「共 N 条 · 第 X/X 页」摘要 */
+  total?: number;
 }
 
 const DEFAULT_PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
@@ -30,9 +32,10 @@ export default function Pagination({
   pageSize,
   onPageSizeChange,
   pageSizeOptions = DEFAULT_PAGE_SIZE_OPTIONS,
+  total,
 }: PaginationProps) {
-  // 仅当只有一页且未开启每页选择器时整体隐藏（开启选择器时即使单页也保留选择入口）
-  if (totalPages <= 1 && !onPageSizeChange) return null;
+  // 仅当只有一页、未开启每页选择器且无总数摘要时整体隐藏（传入 total 时始终展示摘要）
+  if (totalPages <= 1 && !onPageSizeChange && total === undefined) return null;
 
   const isLoading = state === 'loading';
   const isError = state === 'error';
@@ -68,13 +71,20 @@ export default function Pagination({
   );
 
   const showSelector = !!onPageSizeChange && pageSizeOptions.length > 0;
+  const showSummary = total !== undefined;
 
   return (
     <div
-      className="flex items-center justify-center gap-3 mt-6 flex-wrap"
+      className={`flex items-center gap-3 mt-6 flex-wrap ${showSummary ? 'justify-between' : 'justify-center'}`}
       role="navigation"
       aria-label="分页"
     >
+      {showSummary && (
+        <span className="text-sm text-ink-3">
+          共 {total} 条 · 第 {currentPage}/{totalPages} 页
+        </span>
+      )}
+
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-1.5">
           <button

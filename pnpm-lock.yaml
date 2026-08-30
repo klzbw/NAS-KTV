@@ -151,6 +151,8 @@ importers:
         specifier: ^5.3.2
         version: 5.9.3
 
+  packages/downloader: {}
+
   packages/mobile-h5:
     dependencies:
       '@nasktv/shared':

@@ -13,6 +13,8 @@ import type {
   PongPayload,
   PlayerStatePayload,
   LyricSyncPayload,
+  MicVolumeCommandPayload,
+  MicVolumeStatePayload,
 } from '@nasktv/shared';
 import {
   updateLastActiveAt,
@@ -63,10 +65,14 @@ const roomPlayerStateCache = new Map<string, PlayerStatePayload>();
 // 房间歌词偏移配置缓存（roomCode → offsetMs）
 // TV 端重连/重启后由服务端补发，保证当前房间生命周期内偏移不丢失。
 const roomLyricOffsetCache = new Map<string, number>();
-
 // 房间最新歌词行同步缓存（roomCode → LyricSyncPayload）
 // 供 H5 客户端重连后恢复当前歌词行索引，避免回退到首行。
 const roomLyricSyncCache = new Map<string, LyricSyncPayload>();
+
+// 房间麦克风音量状态缓存（roomCode → MicVolumeStatePayload）
+// TV 端应用音量后广播，服务端缓存并下发；H5/新连接重连后由服务端补发，
+// 保证当前房间生命周期内麦克风音量状态不丢失、多端显示一致。
+const roomMicVolumeCache = new Map<string, MicVolumeStatePayload>();
 
 // 房间播放器状态版本号（roomCode → version）
 // 每次收到 TV 端 PLAYER_STATE 自增后随广播下发，客户端据此丢弃过期状态，
@@ -299,6 +305,36 @@ export function initRoomWsHandler(server: Server): void {
           });
           return;
         }
+
+        // MIC_VOLUME_CMD：手机麦克风音量遥控命令，转发给房间内 TV 端执行
+        // 与 PLAYER_COMMAND 同通道（mobile→TV），复用控制锁保证并发顺序确定；
+        // TV 端应用后通过 MIC_VOLUME_STATE 广播把最新状态同步回所有 H5 用户。
+        if (msg.type === WsMessageType.MIC_VOLUME_CMD) {
+          if (ws.role !== 'mobile' || !ws.sessionToken) return;
+          await withRoomControlLock(roomCode, async () => {
+            await assertMobileRoomControl(room.id, ws.sessionToken!);
+            broadcastToTv(roomCode, msg, ws);
+          });
+          return;
+        }
+
+        // MIC_VOLUME_STATE：TV 端麦克风音量状态，缓存并广播给房间内所有客户端。
+        // 排除发送者（TV 自身无需回环），状态由服务端缓存供后续 H5 重连补发。
+        if (msg.type === WsMessageType.MIC_VOLUME_STATE) {
+          if (ws.role !== 'tv' || !ws.deviceId) return;
+          await assertTvWsControl(ws, room.id);
+          const payload = (msg.payload ?? {}) as MicVolumeStatePayload;
+          if (typeof payload.volume !== 'number' || typeof payload.muted !== 'boolean') return;
+          const normalized: MicVolumeStatePayload = {
+            volume: Math.max(0, Math.min(1, Number(payload.volume) || 0)),
+            muted: !!payload.muted,
+            supported: payload.supported !== false, // 缺省视为支持，避免 UI 误禁用
+            timestamp: Date.now(),
+          };
+          roomMicVolumeCache.set(roomCode, normalized);
+          broadcastToRoom(roomCode, { ...msg, payload: normalized }, ws);
+          return;
+        }
       } catch {
         // 忽略无效消息或已失效身份发来的控制消息
       }
@@ -330,6 +366,18 @@ export function initRoomWsHandler(server: Server): void {
         }),
       );
     }
+
+    // 补发最新麦克风音量状态（TV/H5 重连后恢复麦克风音量显示，多端一致）
+    const micVolume = roomMicVolumeCache.get(roomCode);
+    if (micVolume && ws.readyState === WebSocket.OPEN) {
+      ws.send(
+        JSON.stringify({
+          type: WsMessageType.MIC_VOLUME_STATE,
+          payload: micVolume,
+          timestamp: Date.now(),
+        }),
+      );
+    }
   });
 
   // 启动服务端心跳定时器
@@ -355,6 +403,7 @@ function removeConnection(ws: RoomWs, roomCode: string): void {
       roomPlayerStateCache.delete(roomCode);
       roomLyricOffsetCache.delete(roomCode);
       roomLyricSyncCache.delete(roomCode);
+      roomMicVolumeCache.delete(roomCode);
       lastActiveWriteThrottle.delete(roomCode);
     }
   }

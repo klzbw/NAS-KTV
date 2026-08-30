@@ -187,6 +187,15 @@ class SeparatorClient {
     return this.request<GpuInfo>('GET', '/api/gpu/info', undefined, INSTALL_TIMEOUT_MS);
   }
 
+  /** 运行时推送配置到分离服务（推理设备：cpu | cuda | auto）。 */
+  async pushConfig(body: { device?: 'cpu' | 'cuda' | 'auto' }): Promise<{
+    status: string;
+    device: string;
+    configured: string;
+  }> {
+    return this.request('POST', '/api/config', body);
+  }
+
   async installGpu(proxy?: string): Promise<Response> {
     const qs = proxy ? `?proxy=${encodeURIComponent(proxy)}` : '';
     return fetch(`${this.baseURL}/api/gpu/install-gpu${qs}`, {

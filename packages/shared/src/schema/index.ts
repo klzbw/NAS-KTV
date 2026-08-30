@@ -8,6 +8,7 @@ import { rooms, roomQueues } from './rooms';
 import { playlists, playlistSongs } from './playlists';
 import { separationTasks } from './separation';
 import { aiParseTasks } from './ai-parse';
+import { transcodeTasks } from './transcode';
 import { settings } from './settings';
 import { playHistory } from './play_history';
 import { roomSessions } from './room_sessions';
@@ -25,6 +26,7 @@ export * from './rooms';
 export * from './playlists';
 export * from './separation';
 export * from './ai-parse';
+export * from './transcode';
 export * from './settings';
 export * from './play_history';
 export * from './room_sessions';
@@ -45,6 +47,7 @@ export const songsRelations = relations(songs, ({ one, many }) => ({
   songCategories: many(songCategories),
   separationTasks: many(separationTasks),
   aiParseTasks: many(aiParseTasks),
+  transcodeTasks: many(transcodeTasks),
   roomQueues: many(roomQueues),
   playlistSongs: many(playlistSongs),
 }));
@@ -117,6 +120,13 @@ export const aiParseTasksRelations = relations(aiParseTasks, ({ one }) => ({
   }),
 }));
 
+export const transcodeTasksRelations = relations(transcodeTasks, ({ one }) => ({
+  song: one(songs, {
+    fields: [transcodeTasks.songId],
+    references: [songs.id],
+  }),
+}));
+
 export const songArtistsRelations = relations(songArtists, ({ one }) => ({
   song: one(songs, {
     fields: [songArtists.songId],
@@ -141,6 +151,7 @@ export {
   playlistSongs,
   separationTasks,
   aiParseTasks,
+  transcodeTasks,
   settings,
   playHistory,
   roomSessions,

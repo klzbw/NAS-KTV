@@ -14,6 +14,11 @@ export enum WsMessageType {
   LYRIC_SYNC = 'LYRIC_SYNC',
   LYRIC_OFFSET = 'LYRIC_OFFSET',
 
+  // 麦克风采集音量：手机遥控下发命令（MIC_VOLUME_CMD）由后端中转给 TV 端执行；
+  // TV 端应用后广播最新状态（MIC_VOLUME_STATE）给房间内所有客户端同步显示。
+  MIC_VOLUME_CMD = 'MIC_VOLUME_CMD',
+  MIC_VOLUME_STATE = 'MIC_VOLUME_STATE',
+
   // 心跳检测：客户端发 PING，服务端回 PONG
   PING = 'PING',
   PONG = 'PONG',
@@ -24,6 +29,11 @@ export enum WsMessageType {
   SEPARATION_PROGRESS = 'SEPARATION_PROGRESS',
   SEPARATION_COMPLETED = 'SEPARATION_COMPLETED',
   SEPARATION_FAILED = 'SEPARATION_FAILED',
+
+  TRANSCODE_STARTED = 'TRANSCODE_STARTED',
+  TRANSCODE_PROGRESS = 'TRANSCODE_PROGRESS',
+  TRANSCODE_COMPLETED = 'TRANSCODE_COMPLETED',
+  TRANSCODE_FAILED = 'TRANSCODE_FAILED',
 
   AI_PARSE_STARTED = 'AI_PARSE_STARTED',
   AI_PARSE_PROGRESS = 'AI_PARSE_PROGRESS',
@@ -179,6 +189,27 @@ export interface LyricOffsetPayload {
   offsetMs: number; // 范围 -10000 ~ 10000
 }
 
+// ===== 麦克风采集音量 =====
+export type MicVolumeCommandName =
+  | 'set' // 设置绝对音量（value: 0~1）
+  | 'adjust' // 相对调节（value: 增量，如 ±0.1）
+  | 'set_mute' // 显式设置静音（value: boolean）
+  | 'toggle_mute'; // 静音/取消静音切换（忽略 value）
+
+export interface MicVolumeCommandPayload {
+  command: MicVolumeCommandName;
+  // set: 0~1 绝对音量；adjust: 增量（可负）；set_mute: boolean；toggle_mute: 忽略
+  value?: number | boolean;
+  userSessionId?: string;
+}
+
+export interface MicVolumeStatePayload {
+  volume: number; // 当前麦克风音量 0~1（静音时仍返回真实音量，muted 单独标记）
+  muted: boolean; // 是否静音
+  supported: boolean; // TV 端是否支持麦克风采集（无设备/未授权为 false，UI 据此禁用）
+  timestamp: number; // 状态生成时间（ms），用于调试与回退判定
+}
+
 export interface SeparationStartedPayload {
   taskId: number;
   songId: number;
@@ -200,6 +231,32 @@ export interface SeparationCompletedPayload {
 }
 
 export interface SeparationFailedPayload {
+  taskId: number;
+  songId: number;
+  error: string;
+}
+
+// ===== 转码相关 Payload =====
+export interface TranscodeStartedPayload {
+  taskId: number;
+  songId: number;
+  songTitle: string;
+}
+
+export interface TranscodeProgressPayload {
+  taskId: number;
+  songId: number;
+  progress: number;
+  stage: string;
+}
+
+export interface TranscodeCompletedPayload {
+  taskId: number;
+  songId: number;
+  transcodedPath: string;
+}
+
+export interface TranscodeFailedPayload {
   taskId: number;
   songId: number;
   error: string;

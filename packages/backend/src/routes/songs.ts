@@ -14,9 +14,11 @@ import { processMediaFile, getSeparationModel } from '../services/scanner';
 import { removeUnknownCategory, deleteCategoryItemIfOrphan } from '../services/song-info-parser';
 import { separationQueue } from '../services/separation-queue';
 import { aiParseQueue } from '../services/ai-queue';
+import { transcodeQueue } from '../services/transcode-queue';
 import {
   getAutoSeparateEnabled,
   getAutoAiParseEnabled,
+  getAutoTranscodeEnabled,
 } from '../services/settings-service';
 
 const router = Router();
@@ -116,6 +118,17 @@ router.post(
         }
         if (await getAutoAiParseEnabled()) {
           aiParseQueue.enqueue(songId);
+        }
+        // 仅对 video 歌曲自动转码；enqueue 内部也会校验 fileType，这里先查避免无意义报错
+        if (await getAutoTranscodeEnabled()) {
+          const song = db
+            .select({ fileType: schema.songs.fileType })
+            .from(schema.songs)
+            .where(eq(schema.songs.id, songId))
+            .get();
+          if (song?.fileType === 'video') {
+            await transcodeQueue.enqueue(songId);
+          }
         }
       } catch (error) {
         logger.error('Auto enqueue after upload failed:', error);

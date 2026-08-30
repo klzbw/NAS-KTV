@@ -262,7 +262,7 @@ export default function Scan() {
   // 加载去重任务（scanId → 任务映射，供历史列表关联展示）
   const loadDedupTasks = useCallback(async () => {
     try {
-      const tasks = await dedupApi.tasks(50);
+      const tasks = await dedupApi.tasks({ page: 1, pageSize: 50 }).then((r) => r.items);
       const map: Record<string, DedupTaskItem> = {};
       for (const t of tasks) {
         if (t.scanId) map[t.scanId] = t;
@@ -771,16 +771,13 @@ export default function Scan() {
           </div>
         )}
         {!historyLoading && !historyError && totalHistory > 0 && (
-          <div className="px-md py-sm border-t border-border flex items-center justify-between gap-md flex-wrap">
-            <span className="text-sm text-ink-3">
-              第 {page}/{Math.max(1, Math.ceil(totalHistory / historyPageSize))} 页，共{' '}
-              {totalHistory} 条
-            </span>
+          <div className="px-md py-sm border-t border-border">
             <Pagination
               currentPage={page}
               totalPages={Math.max(1, Math.ceil(totalHistory / historyPageSize))}
               onPageChange={setPage}
               pageSize={historyPageSize}
+              total={totalHistory}
               onPageSizeChange={(s) => {
                 setHistoryPageSize(s);
                 setPage(1);
@@ -924,6 +921,7 @@ export default function Scan() {
                   totalPages={Math.max(1, Math.ceil(results.total / resultPageSize))}
                   onPageChange={setResultPage}
                   pageSize={resultPageSize}
+                  total={results.total}
                   onPageSizeChange={(s) => {
                     setResultPageSize(s);
                     setResultPage(1);

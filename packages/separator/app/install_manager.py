@@ -12,7 +12,6 @@ from typing import Optional, List, Tuple, AsyncGenerator
 from app.gpu_manager import (
     _get_python,
     _find_installer,
-    _stream_lines,
     detect_nvidia_gpu,
     PYTORCH_INDEX_URL,
     PYTORCH_CPU_INDEX_URL,
@@ -344,18 +343,48 @@ class InstallManager:
     # ---------- 后台安装执行 ----------
 
     async def _run_pip(self, args: list, env: dict, stage: str) -> int:
-        """执行一条 pip 安装命令，日志实时收集。"""
-        process = await asyncio.create_subprocess_exec(
-            *args,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.STDOUT,
-            cwd=str(PROJECT_ROOT),
-            env=env,
-        )
-        async for line in _stream_lines(process):
-            self._log(f'{stage}: {line}')
-        await process.wait()
-        return process.returncode
+        """执行一条 pip 安装命令，日志实时收集。
+
+        改用 subprocess.Popen 在后台线程读取输出，规避 Windows 下
+        asyncio.create_subprocess_exec 因事件循环非 Proactor 而抛
+        NotImplementedError 的问题；Docker/Linux 下行为一致。
+        """
+
+        def _pump() -> int:
+            proc = subprocess.Popen(
+                args,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                cwd=str(PROJECT_ROOT),
+                env=env,
+            )
+            assert proc.stdout is not None
+            stream = proc.stdout
+            buffer = b''
+            while True:
+                chunk = stream.read(128)
+                if not chunk:
+                    break
+                buffer += chunk
+                while True:
+                    candidates = [i for i in (buffer.find(b'\n'), buffer.find(b'\r')) if i != -1]
+                    idx = min(len(buffer), *(candidates or [len(buffer)]))
+                    if idx == len(buffer) and idx > 0:
+                        line_bytes, buffer = buffer, b''
+                    elif idx < len(buffer):
+                        line_bytes, buffer = buffer[:idx], buffer[idx + 1:]
+                    else:
+                        break
+                    line = line_bytes.decode('utf-8', errors='replace').rstrip('\r')
+                    if line:
+                        self._log(f'{stage}: {line}')
+            if buffer:
+                line = buffer.decode('utf-8', errors='replace').rstrip('\r')
+                if line:
+                    self._log(f'{stage}: {line}')
+            return proc.wait()
+
+        return await asyncio.to_thread(_pump)
 
     async def _install(self, proxy: Optional[str]):
         """后台安装主流程：torch（pip/wheel）→ demucs → 校验。"""

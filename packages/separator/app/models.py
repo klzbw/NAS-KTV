@@ -14,6 +14,14 @@ class SeparateRequest(BaseModel):
     model: str = Field(default="htdemucs", description="Demucs模型名称")
     callback_url: Optional[str] = Field(default=None, description="进度回调URL")
 
+class ConfigRequest(BaseModel):
+    device: Literal['cpu', 'cuda', 'auto'] = Field(default='auto', description="推理设备：cpu/cuda/auto")
+
+class ConfigResponse(BaseModel):
+    status: str = "ok"
+    device: str = Field(..., description="当前实际使用的设备（cuda/cpu）")
+    configured: str = Field(..., description="用户配置的设备（cpu/cuda/auto）")
+
 class SeparateResponse(BaseModel):
     task_id: str
     status: TaskStatus

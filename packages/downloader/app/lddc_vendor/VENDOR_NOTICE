@@ -1,0 +1,45 @@
+LDDC lyrics core — vendored (GPL-3.0-only)
+==========================================
+
+Upstream: https://github.com/chenmozhijin/LDDC
+Vendored commit: 84631e8cd011fcc3f71ca0ae017e2c9758958ffc  (2025-06-24)
+Upstream license: GPL-3.0-only  (Copyright (C) 2024-2025 沉默の金 <cmzj@cmzj.org>)
+
+This directory (LDDC/) is a trimmed, headless copy of LDDC's lyrics-matching core,
+integrated as-needed into the NASKTV downloader microservice so it can search/fetch
+lyrics from QQ Music / Kugou / NetEase Cloud Music / Lrclib without the PySide6 GUI
+dependency.
+
+Modifications made during vendoring
+-----------------------------------
+1. LDDC/common/logger.py
+   Replaced the PySide6-based logger (Qt message handler + on-disk file logging) with a
+   stdlib logging adapter exposing the same `logger` object interface. No GUI, no files.
+
+2. LDDC/common/data/cache.py
+   Replaced the `diskcache`-backed cache (filesystem SQLite, pulls in PySide6 via
+   common.data.config) with an in-memory dict stand-in (`cache.get`/`cache.set`,
+   `cache.memoize()` decorator, and `cached_call_with_status`). No on-disk caching;
+   results are fetched live per request.
+
+3. LDDC/core/api/lyrics/__init__.py
+   - Removed the module-level cached wrapper functions (search/get_songlist/
+     get_lyricslist/get_lyrics) and the `cached_call_with_status` import.
+   - Removed the `LocalAPI` (local-file) source from LyricsAPI.init(); only cloud
+     sources (QQ/Kugou/NetEase/Lrclib) are wired up.
+
+Removed (not needed for headless cloud lyrics)
+----------------------------------------------
+Whole subtrees / modules dropped: gui/, res/resource_rc.py (+ i18n, img, resource.qrc),
+core/converter/, core/algorithm.py, core/song_info.py, core/auto_fetch.py,
+core/api/translate/, core/api/lyrics/local.py, core/parser/{ass,srt,cue,json_lrc}.py,
+common/data/config.py, common/data/local_song_lyrics_db.py, and the helper modules
+common/{translator,task_manager,thread,paths,args,utils,path_processor}.py.
+
+Retained data file: res/ne_deviceids.py (pure NetEase device-id data, no PySide6).
+
+Compliance
+----------
+LDDC is licensed GPL-3.0-only. This vendored copy is distributed under the same license.
+The original copyright and SPDX headers are preserved on every retained file. The full
+GPL-3.0 text applies to this directory; see https://www.gnu.org/licenses/gpl-3.0.html.

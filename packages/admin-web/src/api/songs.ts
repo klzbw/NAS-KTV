@@ -61,6 +61,12 @@ export const songsApi = {
     client
       .post<ApiResponse<{ taskId: number; songId: number }>>(`/songs/${id}/separate`)
       .then((res) => res.data.data),
+  transcode: (id: number, profile?: string): Promise<{ taskId: number; songId: number }> =>
+    client
+      .post<ApiResponse<{ taskId: number; songId: number }>>(`/songs/${id}/transcode`, {
+        profile,
+      })
+      .then((res) => res.data.data),
   getLyricsRaw: (id: number): Promise<{ content: string }> =>
     client
       .get<ApiResponse<{ content: string }>>(`/songs/${id}/lyrics/raw`)

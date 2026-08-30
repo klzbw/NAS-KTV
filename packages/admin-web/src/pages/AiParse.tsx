@@ -41,6 +41,7 @@ import ConfirmModal from '../components/ConfirmModal';
 import Input from '../components/Input';
 import Loading from '../components/Loading';
 import Pagination from '../components/Pagination';
+import AiParseResultEditor from '../components/AiParseResultEditor';
 import { useToast } from '../components/Toast';
 
 const statusVariantMap: Record<string, 'neutral' | 'info' | 'success' | 'danger' | 'warning'> = {
@@ -59,6 +60,12 @@ const statusLabel: Record<string, string> = {
   failed: '失败',
   rejected: '已拒绝',
   rolled_back: '已回滚',
+};
+
+const reviewActionLabel: Record<string, string> = {
+  approve: '通过',
+  modify: '修改后应用',
+  reject: '拒绝',
 };
 
 const filterTabs = [
@@ -148,6 +155,16 @@ function safeParseJson(raw: string | null): Record<string, unknown> | null {
   }
 }
 
+// 拆分源文件路径为 文件名 + 目录（审核界面展示用，兼容 / 与 \ 分隔符）
+function splitFilePath(p?: string | null): { name: string; dir: string } {
+  if (!p) return { name: '—', dir: '' };
+  const norm = p.replace(/\\/g, '/');
+  const idx = norm.lastIndexOf('/');
+  return idx >= 0
+    ? { name: norm.slice(idx + 1), dir: norm.slice(0, idx) }
+    : { name: norm, dir: '' };
+}
+
 function formatJson(obj: unknown): string {
   try {
     if (typeof obj === 'string') return JSON.stringify(JSON.parse(obj), null, 2);
@@ -211,6 +228,8 @@ export default function AiParse() {
   const [detailTask, setDetailTask] = useState<AiParseTask | null>(null);
   const [draftResult, setDraftResult] = useState<Record<string, any> | null>(null);
   const [draftMode, setDraftMode] = useState(false);
+  // 审核备注（详情弹窗可选输入，审核动作时随请求提交）
+  const [reviewNote, setReviewNote] = useState('');
   const [detailLoading, setDetailLoading] = useState(false);
 
   const [promptModalOpen, setPromptModalOpen] = useState(false);
@@ -406,7 +425,7 @@ export default function AiParse() {
   const handleApprove = async (task: AiParseTask) => {
     setActionLoadingId(task.id);
     try {
-      await aiParseApi.review(task.id, { action: 'approve' });
+      await aiParseApi.review(task.id, { action: 'approve', reviewNote: reviewNote || undefined });
       showToast('success', '已通过审核');
       setDetailTask(null);
       await loadTasks();
@@ -421,7 +440,7 @@ export default function AiParse() {
   const handleReject = async (task: AiParseTask) => {
     setActionLoadingId(task.id);
     try {
-      await aiParseApi.review(task.id, { action: 'reject' });
+      await aiParseApi.review(task.id, { action: 'reject', reviewNote: reviewNote || undefined });
       showToast('success', '已拒绝');
       setDetailTask(null);
       await loadTasks();
@@ -616,6 +635,7 @@ export default function AiParse() {
     setDetailLoading(true);
     setDraftMode(false);
     setDraftResult(null);
+    setReviewNote('');
     try {
       const full = await aiParseApi.getTask(task.id);
       setDetailTask(full);
@@ -633,6 +653,7 @@ export default function AiParse() {
       await aiParseApi.review(detailTask.id, {
         action: 'modify',
         modifiedResult: draftResult,
+        reviewNote: reviewNote || undefined,
       });
       showToast('success', '已应用修改');
       setDetailTask(null);
@@ -1006,6 +1027,11 @@ export default function AiParse() {
                             待审核
                           </Badge>
                         )}
+                        {task.manualEdited === 1 && (
+                          <Badge variant="info" size="sm" className="ml-1">
+                            人工修改
+                          </Badge>
+                        )}
                       </td>
                       <td className="px-md py-sm">
                         <span className={['font-mono text-sm', confidenceClass(task.confidence)].join(' ')}>
@@ -1106,6 +1132,7 @@ export default function AiParse() {
               totalPages={totalPages}
               onPageChange={setPage}
               pageSize={pageSize}
+              total={total}
               onPageSizeChange={(s) => {
                 setPageSize(s);
                 setPage(1);
@@ -1158,6 +1185,20 @@ export default function AiParse() {
                       <span className="text-sm text-ink">
                         {detailTask.song?.title || `#${detailTask.songId}`}
                       </span>
+                    </div>
+                    <div className="sm:col-span-2 lg:col-span-3">
+                      <span className="text-xs text-ink-3 block mb-xs">源文件</span>
+                      {(() => {
+                        const f = splitFilePath(detailTask.song?.filePath);
+                        return (
+                          <>
+                            <div className="text-sm font-mono text-ink break-all">{f.name}</div>
+                            <div className="text-xs font-mono text-ink-3 break-all mt-0.5">
+                              {f.dir || '—'}
+                            </div>
+                          </>
+                        );
+                      })()}
                     </div>
                     <div>
                       <span className="text-xs text-ink-3 block mb-xs">状态</span>
@@ -1225,6 +1266,37 @@ export default function AiParse() {
                     </div>
                   )}
 
+                  {detailTask.reviewAction && (
+                    <div className="bg-paper-2 rounded-md p-md">
+                      <h4 className="text-sm font-semibold text-ink mb-sm">
+                        审核信息
+                        {detailTask.manualEdited === 1 && (
+                          <Badge variant="info" size="sm" className="ml-2">人工修改</Badge>
+                        )}
+                      </h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-md text-sm">
+                        <div>
+                          <span className="text-xs text-ink-3 block mb-xs">审核动作</span>
+                          <span className="text-ink">
+                            {reviewActionLabel[detailTask.reviewAction] ?? detailTask.reviewAction}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-xs text-ink-3 block mb-xs">审核人</span>
+                          <span className="text-ink">{detailTask.reviewedBy || '—'}</span>
+                        </div>
+                        <div>
+                          <span className="text-xs text-ink-3 block mb-xs">审核时间</span>
+                          <span className="text-ink">{formatTime(detailTask.reviewedAt)}</span>
+                        </div>
+                        <div>
+                          <span className="text-xs text-ink-3 block mb-xs">审核备注</span>
+                          <span className="text-ink-2 break-words">{detailTask.reviewNote || '—'}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {detailMessages && (
                     <CollapsibleSection title="请求消息 (Request Messages)">
                       <pre className="bg-paper-3 rounded-md p-sm text-xs font-mono text-ink-2 overflow-x-auto whitespace-pre-wrap break-all max-h-64 overflow-y-auto">
@@ -1247,74 +1319,10 @@ export default function AiParse() {
                       defaultOpen
                     >
                       {draftMode ? (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-sm">
-                          <div>
-                            <label className="block text-xs text-ink-3 mb-xs">歌手</label>
-                            <input
-                              type="text"
-                              className="w-full rounded-md border border-border bg-paper-2 text-sm text-ink px-3 py-1.5 focus-visible:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-                              value={Array.isArray(draftResult?.artists)
-                                ? draftResult.artists.join('、')
-                                : String(draftResult?.artists ?? '')}
-                              onChange={(e) =>
-                                setDraftResult((d) => ({
-                                  ...(d ?? {}),
-                                  artists: e.target.value
-                                    .split(/[、/,，&]/)
-                                    .map((s) => s.trim())
-                                    .filter(Boolean),
-                                }))
-                              }
-                            />
-                          </div>
-                          {[
-                            ['title', '标题'],
-                            ['album', '专辑'],
-                            ['genre', '风格'],
-                            ['language', '语种'],
-                            ['mood', '心情'],
-                          ].map(([key, label]) => (
-                            <div key={key}>
-                              <label className="block text-xs text-ink-3 mb-xs">
-                                {label}
-                              </label>
-                              <input
-                                type="text"
-                                className="w-full rounded-md border border-border bg-paper-2 text-sm text-ink px-3 py-1.5 focus-visible:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-                                value={String(draftResult?.[key] ?? '')}
-                                onChange={(e) =>
-                                  setDraftResult((d) => ({
-                                    ...(d ?? {}),
-                                    [key]: e.target.value,
-                                  }))
-                                }
-                              />
-                            </div>
-                          ))}
-                          {[
-                            ['year', '年份'],
-                            ['confidence', '置信度'],
-                          ].map(([key, label]) => (
-                            <div key={key}>
-                              <label className="block text-xs text-ink-3 mb-xs">
-                                {label}
-                              </label>
-                              <input
-                                type="number"
-                                className="w-full rounded-md border border-border bg-paper-2 text-sm text-ink px-3 py-1.5 focus-visible:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-                                value={String(draftResult?.[key] ?? '')}
-                                onChange={(e) =>
-                                  setDraftResult((d) => ({
-                                    ...(d ?? {}),
-                                    [key]: e.target.value === ''
-                                      ? ''
-                                      : Number(e.target.value),
-                                  }))
-                                }
-                              />
-                            </div>
-                          ))}
-                        </div>
+                        <AiParseResultEditor
+                          value={draftResult ?? {}}
+                          onChange={setDraftResult}
+                        />
                       ) : (
                         <pre className="bg-paper-3 rounded-md p-sm text-xs font-mono text-ink-2 overflow-x-auto whitespace-pre-wrap break-all">
                           {formatJson(detailParsed)}
@@ -1333,6 +1341,18 @@ export default function AiParse() {
                 </>
               )}
             </div>
+
+            {detailTask.needReview === 1 && detailTask.status === 'completed' && (
+              <div className="px-4 py-3 border-t border-border shrink-0">
+                <input
+                  type="text"
+                  className="w-full rounded-md border border-border bg-paper-2 text-sm text-ink px-3 py-1.5 focus-visible:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                  placeholder="审核备注（可选，记录人工干预原因）"
+                  value={reviewNote}
+                  onChange={(e) => setReviewNote(e.target.value)}
+                />
+              </div>
+            )}
 
             <div className="flex items-center justify-between gap-sm p-4 border-t border-border shrink-0">
               <div className="flex items-center gap-xs">
@@ -1573,6 +1593,7 @@ export default function AiParse() {
             <Pagination
               currentPage={songPickerPage}
               totalPages={Math.ceil(songPickerTotal / 20)}
+              total={songPickerTotal}
               onPageChange={p => {
                 setSongPickerPage(p);
                 loadSongPicker(p, songPickerKeyword);

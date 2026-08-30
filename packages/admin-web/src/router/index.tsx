@@ -11,6 +11,7 @@ import Categories from '../pages/Categories';
 import Devices from '../pages/Devices';
 import AiParse from '../pages/AiParse';
 import Separation from '../pages/Separation';
+import Transcode from '../pages/Transcode';
 import Settings from '../pages/Settings';
 import GpuManage from '../pages/GpuManage';
 import Logs from '../pages/Logs';
@@ -38,6 +39,7 @@ export const router = createBrowserRouter(
         { path: '/devices', element: <Devices /> },
         { path: '/ai-parse', element: <AiParse /> },
         { path: '/separation', element: <Separation /> },
+        { path: '/transcode', element: <Transcode /> },
         { path: '/gpu', element: <GpuManage /> },
         { path: '/logs', element: <Logs /> },
         { path: '/settings', element: <Settings /> },

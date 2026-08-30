@@ -8,11 +8,11 @@ import {
   type PlayerCommandPayload,
 } from '@nasktv/shared';
 import { useWebAudio, type ReverbPreset } from './useWebAudio';
-import type { LyricLine } from '../api/songs';
+import type { LyricLine, LyricWord } from '../api/songs';
 import { Play, Pause, Timer, Music, Music2, Mic, Waves, Volume2, Disc3, type LucideIcon } from 'lucide-react';
 
-// 重新导出 LyricLine，保持下游组件（Lyrics.tsx / NowPlaying.tsx）的既有导入路径
-export type { LyricLine };
+// 重新导出 LyricLine / LyricWord，保持下游组件（LyricsDisplay.tsx / NowPlaying.tsx）的既有导入路径
+export type { LyricLine, LyricWord };
 
 export type VocalMode = 'original' | 'instrumental' | 'vocal_assist';
 

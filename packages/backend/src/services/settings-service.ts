@@ -15,6 +15,10 @@ const KEY_SCAN_MD5_DEDUP = 'scan_md5_dedup';
 const KEY_PYTORCH_PROXY = 'pytorch_proxy';
 const KEY_DOWNLOADER_DEFAULT_SOURCES = 'downloader_default_sources';
 const KEY_DOWNLOADER_CONCURRENCY = 'downloader_concurrency';
+const KEY_TRANSCODE_AUTO_ENABLE = 'transcode_auto_enable';
+const KEY_TRANSCODE_CONCURRENCY = 'transcode_concurrency';
+const KEY_TRANSCODE_PROFILE = 'transcode_profile';
+const KEY_SEPARATOR_DEVICE = 'separator_device';
 
 /**
  * 查询所有设置项
@@ -149,4 +153,45 @@ export async function getDownloaderConcurrency(): Promise<number> {
   return Number.isFinite(val) && val > 0
     ? val
     : parseEnvConcurrency('DOWNLOAD_CONCURRENCY', 2);
+}
+
+/**
+ * 是否启用扫描后自动转码（默认关闭）。
+ * 与「扫描后自动人声分离」同构：新入库的 video 歌曲自动触发转码。
+ */
+export async function getAutoTranscodeEnabled(): Promise<boolean> {
+  const row = await getSetting(KEY_TRANSCODE_AUTO_ENABLE);
+  return row?.value === 'true';
+}
+
+/**
+ * 获取转码并发数。
+ * 优先级：settings 表 transcode_concurrency > 环境变量 TRANSCODE_CONCURRENCY > 默认 1。
+ */
+export async function getTranscodeConcurrency(): Promise<number> {
+  const row = await getSetting(KEY_TRANSCODE_CONCURRENCY);
+  const val = row?.value ? parseInt(row.value, 10) : NaN;
+  return Number.isFinite(val) && val > 0
+    ? val
+    : parseEnvConcurrency('TRANSCODE_CONCURRENCY', 1);
+}
+
+/**
+ * 转码画质预设 key（compatible | standard | high），默认 standard。
+ * 具体分辨率/码率由 transcode-queue 的 PROFILES 映射，无需单独存储。
+ */
+export async function getTranscodeProfile(): Promise<string> {
+  const row = await getSetting(KEY_TRANSCODE_PROFILE);
+  return row?.value || 'standard';
+}
+
+/**
+ * 获取人声分离推理设备（cpu | cuda | auto）。
+ * 优先级：settings 表 separator_device > 环境变量 SEPARATOR_DEVICE > 默认 auto。
+ * 非法值回落 auto。
+ */
+export async function getSeparatorDevice(): Promise<'cpu' | 'cuda' | 'auto'> {
+  const row = await getSetting(KEY_SEPARATOR_DEVICE);
+  const value = (row?.value || process.env.SEPARATOR_DEVICE || '').trim().toLowerCase();
+  return value === 'cpu' || value === 'cuda' || value === 'auto' ? value : 'auto';
 }

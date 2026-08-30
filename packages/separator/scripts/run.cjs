@@ -17,7 +17,10 @@ if (!fs.existsSync(venvPython)) {
 }
 
 const extraArgs = process.argv.slice(2);
-const args = ['-m', 'uvicorn', 'app.main:app', '--host', '0.0.0.0', '--port', '8001', ...extraArgs];
+const reloadArgs = extraArgs.includes('--reload')
+  ? ['--reload-dir', path.join(separatorDir, 'app')]
+  : [];
+const args = ['-m', 'uvicorn', 'app.main:app', '--host', '0.0.0.0', '--port', '8001', ...extraArgs, ...reloadArgs];
 
 const child = spawn(venvPython, args, {
   cwd: separatorDir,

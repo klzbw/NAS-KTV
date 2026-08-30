@@ -37,6 +37,10 @@ export const config = {
   separationOutputDir: resolvePath(
     process.env.SEPARATION_OUTPUT_DIR || './data/separation',
   ),
+  // 转码产物目录（MV → 通用 MP4），按 songId 子目录存放
+  transcodeOutputDir: resolvePath(
+    process.env.TRANSCODE_OUTPUT_DIR || './data/transcoded',
+  ),
 } as const;
 
 export type Config = typeof config;

@@ -295,11 +295,16 @@ router.get('/ai-parse/tasks/:id', authenticateToken, async (req: Request, res: R
 
 /**
  * POST /api/ai-parse/tasks/:id/review - 审核解析结果
+ *
+ * 三种动作统一记录审核留痕（reviewedBy / reviewedAt / reviewAction / reviewNote），
+ * 人工修改（modify）额外置 manualEdited=1 并同步 songs.ai_manual_edited。
+ * ai_result 为 AI 原始解析结果快照：解析完成时由队列写入；历史任务为 NULL 时在此补快照，
+ * 之后 result 被人工修改覆盖也能与 AI 原始结果对比。
  */
 router.post('/ai-parse/tasks/:id/review', authenticateToken, async (req: Request, res: Response) => {
   try {
     const taskId = parseInt(req.params.id);
-    const { action, modifiedResult } = req.body;
+    const { action, modifiedResult, reviewNote } = req.body;
     // action: 'approve' | 'reject' | 'modify'
     
     const task = db.select()
@@ -310,6 +315,16 @@ router.post('/ai-parse/tasks/:id/review', authenticateToken, async (req: Request
     if (!task) {
       return res.status(404).json({ success: false, error: 'Task not found' });
     }
+
+    // 审核留痕公共字段（审核人取自 JWT，接口均经 authenticateToken）
+    const reviewer = req.user?.username || 'unknown';
+    const reviewedAt = new Date();
+    const reviewBase = {
+      reviewedBy: reviewer,
+      reviewedAt,
+      reviewAction: action,
+      reviewNote: typeof reviewNote === 'string' && reviewNote.trim() ? reviewNote.trim() : null,
+    };
     
     if (action === 'approve') {
       // 批准 - 应用解析结果（人工确认，aiParsed 置为已解析）
@@ -318,22 +333,42 @@ router.post('/ai-parse/tasks/:id/review', authenticateToken, async (req: Request
       await aiParseService.applyParseResult(task.songId!, result, { approved: true });
       
       db.update(schema.aiParseTasks)
-        .set({ needReview: 0 })
+        .set({
+          needReview: 0,
+          ...reviewBase,
+          // 历史任务 ai_result 为空时补 AI 原始快照（此时 result 尚未被覆盖）
+          aiResult: task.aiResult ?? task.result,
+        })
         .where(eq(schema.aiParseTasks.id, taskId))
+        .run();
+
+      // 通过应用 AI 结果：清除歌曲人工修改标记
+      db.update(schema.songs)
+        .set({ aiManualEdited: 0 })
+        .where(eq(schema.songs.id, task.songId!))
         .run();
       
       res.json({ success: true, message: 'Result approved and applied' });
     } else if (action === 'modify' && modifiedResult) {
-      // 修改后应用（人工确认，aiParsed 置为已解析）
+      // 修改后应用（人工确认，aiParsed 置为已解析；记录人工修改留痕）
       const { aiParseService } = await import('../services/ai-parse-service');
       await aiParseService.applyParseResult(task.songId!, modifiedResult, { approved: true });
       
       db.update(schema.aiParseTasks)
-        .set({ 
+        .set({
           needReview: 0,
-          result: JSON.stringify(modifiedResult)
+          result: JSON.stringify(modifiedResult),
+          aiResult: task.aiResult ?? task.result,
+          manualEdited: 1,
+          ...reviewBase,
         })
         .where(eq(schema.aiParseTasks.id, taskId))
+        .run();
+
+      // 人工修改过的结果：同步歌曲标记（列表徽标展示）
+      db.update(schema.songs)
+        .set({ aiManualEdited: 1 })
+        .where(eq(schema.songs.id, task.songId!))
         .run();
       
       res.json({ success: true, message: 'Modified result applied' });
@@ -341,7 +376,11 @@ router.post('/ai-parse/tasks/:id/review', authenticateToken, async (req: Request
       // 拒绝：清理任务待审核标记，并清除歌曲的待审核标记
       // （否则歌曲管理页徽标会永远停在「待审核」，可无限次重复审核）
       db.update(schema.aiParseTasks)
-        .set({ needReview: 0, status: 'rejected' })
+        .set({
+          needReview: 0,
+          status: 'rejected',
+          ...reviewBase,
+        })
         .where(eq(schema.aiParseTasks.id, taskId))
         .run();
 

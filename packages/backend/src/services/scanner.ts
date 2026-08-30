@@ -18,6 +18,7 @@ import {
 import { initializeDefaultCategories, isDefaultCategoriesInitialized } from './category-init';
 import { separationQueue } from './separation-queue';
 import { aiParseQueue } from './ai-queue';
+import { transcodeQueue } from './transcode-queue';
 import { getAutoAiParseEnabled, getScanMd5DedupEnabled } from './settings-service';
 import { countArtistSongs, deleteSong, setSongArtists } from './song-service';
 import {
@@ -649,6 +650,13 @@ export async function scanDirectory(dirPath: string, options?: {
       } catch (error) {
         logger.error('Auto AI parse enqueue failed:', error);
       }
+
+      // 扫描完成后自动入队转码任务（仅 video 歌曲）
+      try {
+        await autoEnqueueTranscode(newSongIds);
+      } catch (error) {
+        logger.error('Auto transcode enqueue failed:', error);
+      }
     }
     
   } catch (error) {
@@ -747,6 +755,52 @@ async function autoEnqueueSeparation(songIds: number[]): Promise<void> {
 
   logger.info(
     `Auto separation enqueue: ${enqueued} succeeded, ${failed} failed (model=${model})`,
+  );
+}
+
+/**
+ * 读取「扫描后自动转码」开关（默认关闭，与分离默认开启不同）。
+ */
+function isAutoTranscodeEnabled(): boolean {
+  const value = getSetting('transcode_auto_enable', 'false');
+  return value === 'true';
+}
+
+/**
+ * 扫描完成后自动将新增的 video 歌曲入队转码。
+ *
+ * 错误隔离：单首入队失败不影响其他歌曲；非 video 歌曲直接跳过。
+ */
+async function autoEnqueueTranscode(songIds: number[]): Promise<void> {
+  if (!isAutoTranscodeEnabled()) {
+    return;
+  }
+
+  let enqueued = 0;
+  let skipped = 0;
+  let failed = 0;
+
+  for (const songId of songIds) {
+    try {
+      const song = db
+        .select({ fileType: schema.songs.fileType })
+        .from(schema.songs)
+        .where(eq(schema.songs.id, songId))
+        .get();
+      if (!song || song.fileType !== 'video') {
+        skipped++;
+        continue;
+      }
+      await transcodeQueue.enqueue(songId);
+      enqueued++;
+    } catch (error) {
+      failed++;
+      logger.error(`Auto transcode enqueue failed for song ${songId}:`, error);
+    }
+  }
+
+  logger.info(
+    `Auto transcode enqueue: ${enqueued} succeeded, ${skipped} skipped (non-video), ${failed} failed`,
   );
 }
 

@@ -13,14 +13,18 @@ import routes from './routes';
 import { initScanProgressHandler, registerScanClient } from './ws/scan-handler';
 import { initAiParseProgressHandler, registerAiParseClient } from './ws/ai-parse-handler';
 import { initSeparationProgressHandler, registerSeparationClient } from './ws/separation-handler';
+import { initTranscodeProgressHandler, registerTranscodeClient } from './ws/transcode-handler';
 import { initRoomWsHandler, broadcastRoomExpiringSoon } from './ws/room-handler';
 import { separationQueue, backfillMissingDurations } from './services/separation-queue';
+import { transcodeQueue } from './services/transcode-queue';
 import { aiParseQueue } from './services/ai-queue';
 import { findExpiringSoonRooms, revokeExpiredAuthorizations, closeIdleAndStaleRooms } from './services/room-service';
 import { createLogTransport, logService } from './services/log-service';
 import { startSeparatorLogPoller, stopSeparatorLogPoller } from './services/separator-log-poller';
 import { startDownloaderLogPoller, stopDownloaderLogPoller } from './services/downloader-log-poller';
 import { startDiscoveryBroadcast } from './services/discovery';
+import { separatorClient } from './services/separator-client';
+import { getSeparatorDevice } from './services/settings-service';
 
 // 全局兜底：异步 handler 中未捕获的错误不应导致进程退出
 process.on('unhandledRejection', (reason) => {
@@ -122,6 +126,7 @@ async function main() {
     initScanProgressHandler();
     initAiParseProgressHandler();
     initSeparationProgressHandler();
+    initTranscodeProgressHandler();
 
     // 启动 UDP 局域网发现广播（TV 端自动扫描后端服务用）
     startDiscoveryBroadcast();
@@ -130,8 +135,19 @@ async function main() {
     separationQueue.recoverPendingTasks();
     // 恢复数据库中未完成的 AI 解析任务
     aiParseQueue.recoverPendingTasks();
+    // 恢复数据库中未完成的转码任务
+    transcodeQueue.recoverPendingTasks();
     // 回填存量分离歌曲缺失的时长（不阻塞启动）
     void backfillMissingDurations();
+    // 启动时同步人声分离推理设备配置到分离服务（separator 未就绪时失败仅告警，下次保存设置时再同步）
+    void (async () => {
+      try {
+        const device = await getSeparatorDevice();
+        await separatorClient.pushConfig({ device });
+      } catch (e) {
+        logger.warn('启动时推送分离推理设备配置失败:', e);
+      }
+    })();
 
     const server = app.listen(config.port, () => {
       logger.info(`Server running on port ${config.port} [${config.nodeEnv}]`);
@@ -182,6 +198,7 @@ async function main() {
         registerScanClient(ws);
         registerSeparationClient(ws);
         registerAiParseClient(ws);
+        registerTranscodeClient(ws);
         adminWss.emit('connection', ws, request);
         logger.info('Admin WebSocket client connected');
       });

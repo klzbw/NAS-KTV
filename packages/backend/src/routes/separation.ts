@@ -766,6 +766,11 @@ router.put(
         )
         .replace(/\\/g, '/');
       fs.mkdirSync(path.dirname(lyricsFile), { recursive: true });
+      // 覆盖前备份（保留最近一份 .bak），便于误覆盖时回退。
+      const backupFile = lyricsFile + '.bak';
+      if (fs.existsSync(lyricsFile)) {
+        fs.copyFileSync(lyricsFile, backupFile);
+      }
       fs.writeFileSync(lyricsFile, content, 'utf-8');
 
       db.update(schema.songs)
@@ -773,7 +778,7 @@ router.put(
         .where(eq(schema.songs.id, songId))
         .run();
 
-      res.json({ success: true, data: { lineCount, path: lyricsFile } });
+      res.json({ success: true, data: { lineCount, path: lyricsFile, backupPath: fs.existsSync(backupFile) ? backupFile : null } });
     } catch (error) {
       if (error instanceof Error && 'statusCode' in error) {
         return res

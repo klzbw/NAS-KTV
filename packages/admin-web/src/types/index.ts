@@ -24,7 +24,13 @@ export interface Song {
   aiParsed: number;
   /** 是否需要人工审核 AI 解析结果（1=待审核，0=已处理/无需审核） */
   aiNeedReview?: number;
+  /** 当前 AI 解析结果是否经人工修改（1=是，列表徽标用） */
+  aiManualEdited?: number;
   separationStatus?: string | null;
+  // 转码（MV → 通用视频）状态与产物
+  transcodedPath?: string | null;
+  transcodeStatus?: string | null;
+  transcodeProfile?: string | null;
   createdAt: string;
   categories?: { categoryId: number; categoryName: string; categoryItemId: number; categoryItemName: string }[];
 }
@@ -179,6 +185,24 @@ export interface SeparationTask {
 }
 
 export interface SeparationTaskListParams {
+  page?: number;
+  pageSize?: number;
+  status?: string;
+}
+
+export interface TranscodeTask {
+  id: number;
+  songId: number;
+  status: string;
+  profile: string | null;
+  progress: number;
+  stage: string | null;
+  error: string | null;
+  createdAt: string;
+  completedAt: string | null;
+}
+
+export interface TranscodeTaskListParams {
   page?: number;
   pageSize?: number;
   status?: string;

@@ -1,9 +1,17 @@
 import client from './client';
 
+// 逐字歌词片段
+export interface LyricWord {
+  text: string; // 逐字文本
+  start: number; // 起播时间，秒（绝对歌曲时间）
+  end: number;   // 结束时间，秒（绝对歌曲时间）
+}
+
 // 歌词行
 export interface LyricLine {
-  time: number;  // 秒
+  time: number;    // 秒
   text: string;
+  words?: LyricWord[]; // 逐字歌词（源 LRC 含 <mm:ss.xx> 时存在）
 }
 
 export const songsApi = {

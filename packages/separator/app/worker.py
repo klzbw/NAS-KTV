@@ -9,8 +9,7 @@ from app.models import TaskStatus, TaskStatusResponse
 from app.audio_utils import extract_audio, transcode_to_mp3, is_video_file, is_audio_file
 from app.demucs_runner import (
     separate,
-    set_device,
-    get_device,
+    apply_configured_device,
     TaskCancelledError,
     release_gpu_resources,
 )
@@ -172,15 +171,9 @@ class SeparateWorker:
 
     def _run(self):
         """工作线程主循环"""
-        # 设置设备
-        try:
-            import torch
-            if torch.cuda.is_available():
-                set_device("cuda")
-            else:
-                set_device("cpu")
-        except ImportError:
-            set_device("cpu")
+        # 设置设备：尊重后台配置（cpu/cuda 强制、auto 自动探测），
+        # 默认 auto 与原行为一致（CUDA 可用则用 GPU，否则 CPU）
+        apply_configured_device()
         
         while self._running:
             try:

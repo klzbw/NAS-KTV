@@ -536,7 +536,6 @@ export default function Devices() {
         </div>
         <div className="flex items-center gap-md">
           <div className="text-sm text-ink-3 font-mono text-right">
-            <div>共 {total} 台设备</div>
             {lastUpdated && (
               <div className="text-xs text-ink-4">
                 更新于 {formatDateTime(lastUpdated.toISOString())}
@@ -848,24 +847,20 @@ export default function Devices() {
         )}
       </div>
 
-      {/* 分页栏：计数 + 统一分页组件（含每页条数选择） */}
+      {/* 分页栏：统一分页组件（含每页条数选择与计数摘要） */}
       {!loading && (
-        <div className="flex items-center justify-between gap-md mt-md flex-wrap">
-          <span className="text-sm text-ink-3">
-            第 {page}/{totalPages} 页，共 {total} 条
-          </span>
-          <Pagination
-            currentPage={page}
-            totalPages={totalPages}
-            onPageChange={setPage}
-            state={loading ? 'loading' : 'default'}
-            pageSize={pageSize}
-            onPageSizeChange={(s) => {
-              setPageSize(s);
-              setPage(1);
-            }}
-          />
-        </div>
+        <Pagination
+          currentPage={page}
+          totalPages={totalPages}
+          onPageChange={setPage}
+          state={loading ? 'loading' : 'default'}
+          pageSize={pageSize}
+          total={total}
+          onPageSizeChange={(s) => {
+            setPageSize(s);
+            setPage(1);
+          }}
+        />
       )}
 
       {/* Authorize / Renew modal（与批量授权 UI 保持一致：永久/临时切换 + 时长选择） */}

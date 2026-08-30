@@ -6,6 +6,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useRoomStore } from '../stores/room';
 import { usePlayer, type VocalMode } from '../hooks/usePlayer';
+import { useMicVolume } from '../hooks/useMicVolume';
+import type { MicVolumeState } from '../services/micVolume';
 import { useLyrics } from '../hooks/useLyrics';
 import { useDpadNavigation } from '../hooks/useDpadNavigation';
 import { useJoinTicket } from '../hooks/useJoinTicket';
@@ -13,7 +15,7 @@ import Visualizer from '../components/Visualizer';
 import LyricsDisplay from '../components/LyricsDisplay';
 import RemoteFeedback from '../components/RemoteFeedback';
 import ProgressBar from '../components/ProgressBar';
-import { ListMusic, Pause, UserRound, Loader2, type LucideIcon } from 'lucide-react';
+import { ListMusic, Pause, UserRound, Loader2, Mic, VolumeX, type LucideIcon } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 import QRCodeLib from 'qrcode';
 import client from '../api/client';
@@ -532,6 +534,19 @@ export default function NowPlaying() {
     onCommandFeedback: showFeedback,
   });
 
+  // 麦克风采集音量控制（TV 端权威）：变化（含 H5 远程触发）时给 OSD 反馈
+  const handleMicChange = useCallback(
+    (s: MicVolumeState) => {
+      showFeedback(
+        s.muted ? VolumeX : Mic,
+        s.muted ? '麦克风 静音' : `麦克风 ${Math.round(s.volume * 100)}%`,
+        s.muted ? 0 : s.volume,
+      );
+    },
+    [showFeedback],
+  );
+  const mic = useMicVolume(handleMicChange);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
@@ -544,6 +559,22 @@ export default function NowPlaying() {
           const idx = modes.indexOf(vocalMode);
           const next = modes[(idx + 1) % modes.length];
           switchVocalMode(next);
+          break;
+        }
+        case 'm':
+        case 'M': {
+          e.preventDefault();
+          mic.toggleMute();
+          break;
+        }
+        case '[': {
+          e.preventDefault();
+          mic.adjustVolume(-mic.step);
+          break;
+        }
+        case ']': {
+          e.preventDefault();
+          mic.adjustVolume(mic.step);
           break;
         }
         case 'MediaTrackPrevious': {
@@ -576,7 +607,7 @@ export default function NowPlaying() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [vocalMode, duration, switchVocalMode, seek, handleSkip, navigate]);
+  }, [vocalMode, duration, switchVocalMode, seek, handleSkip, navigate, mic.adjustVolume, mic.toggleMute, mic.step]);
 
   if (!currentItem) {
     return (
@@ -656,6 +687,7 @@ export default function NowPlaying() {
               currentTime={currentTime}
               duration={duration}
               lyricOffsetMs={lyricOffsetMs}
+              isPlaying={isPlaying}
             />
           )}
         </>
@@ -681,6 +713,45 @@ export default function NowPlaying() {
             onSeek={seek}
             showTimes={false}
           />
+        </div>
+      )}
+
+      {/* 麦克风采集音量指示（仅音频模式常显）：未启用时提供「启用麦克风」入口，
+          已启用时显示当前音量/静音状态（D-pad: m 静音 / [ ] 增减）。H5 遥控为主控制端。 */}
+      {!isVideo && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 'var(--space-md)',
+            marginTop: 'var(--space-md)',
+          }}
+        >
+          {mic.supported ? (
+            <span className="np-pill">
+              {mic.muted ? (
+                <VolumeX size={14} strokeWidth={1.8} className="text-ink-3" />
+              ) : (
+                <Mic size={14} strokeWidth={1.8} className="text-ink-3" />
+              )}
+              {mic.muted ? '麦克风 静音' : `麦克风 ${Math.round(mic.volume * 100)}%`}
+            </span>
+          ) : (
+            <>
+              <button
+                onClick={() => mic.requestMic()}
+                className="np-btn np-btn--small"
+                aria-label="启用麦克风"
+                tabIndex={0}
+                role="button"
+                type="button"
+              >
+                <Mic size={20} strokeWidth={1.8} />
+              </button>
+              <span className="np-pill">麦克风未启用</span>
+            </>
+          )}
         </div>
       )}
 

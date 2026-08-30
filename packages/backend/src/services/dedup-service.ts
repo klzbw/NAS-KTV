@@ -1,5 +1,5 @@
 import { db, schema } from '../db';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, sql } from 'drizzle-orm';
 import * as fs from 'fs';
 import * as path from 'path';
 import logger from '../logger';
@@ -129,17 +129,48 @@ export function getDedupStatus(): { progress: DedupProgress; lastResult: DedupRe
 }
 
 /**
- * 查询去重任务记录
+ * 查询去重任务记录（分页）
  */
-export function getDedupTasks(limit = 20): DedupTaskItem[] {
+export function getDedupTasks(options: { offset?: number; limit?: number } = {}): {
+  items: DedupTaskItem[];
+  total: number;
+} {
+  const limit = options.limit ?? 10;
+  const offset = options.offset ?? 0;
+
   const rows = db
     .select()
     .from(schema.dedupTasks)
     .orderBy(desc(schema.dedupTasks.id))
     .limit(limit)
+    .offset(offset)
     .all();
 
-  return rows.map((row) => ({
+  const countResult = db
+    .select({ count: sql<number>`count(*)` })
+    .from(schema.dedupTasks)
+    .get();
+
+  return {
+    items: rows.map(mapDedupTaskRow),
+    total: countResult?.count ?? 0,
+  };
+}
+
+/**
+ * 查询单个去重任务（供详情弹窗/扫描页 URL 跳转：目标任务可能不在当前分页）
+ */
+export function getDedupTaskById(id: number): DedupTaskItem | null {
+  const row = db
+    .select()
+    .from(schema.dedupTasks)
+    .where(eq(schema.dedupTasks.id, id))
+    .get();
+  return row ? mapDedupTaskRow(row) : null;
+}
+
+function mapDedupTaskRow(row: typeof schema.dedupTasks.$inferSelect): DedupTaskItem {
+  return {
     id: row.id,
     scanId: row.scanId ?? null,
     status: row.status,
@@ -149,7 +180,7 @@ export function getDedupTasks(limit = 20): DedupTaskItem[] {
     removed: row.removed ?? 0,
     duplicates: parseDuplicates(row.duplicates),
     error: row.error,
-  }));
+  };
 }
 
 /**

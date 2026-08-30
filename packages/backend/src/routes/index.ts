@@ -4,6 +4,7 @@ import songsRouter from './songs';
 import scanRouter from './scan';
 import aiParseRouter from './ai-parse';
 import separationRouter from './separation';
+import transcodeRouter from './transcode';
 import roomsRouter from './rooms';
 import roomSessionsRouter from './room-sessions';
 import devicesRouter from './devices';
@@ -19,6 +20,7 @@ import logsRouter from './logs';
 import backupRouter from './backup';
 import dedupRouter from './dedup';
 import downloadRouter from './download';
+import lyricsRouter from './lyrics';
 
 const router = Router();
 
@@ -26,6 +28,8 @@ router.use('/auth', authRouter);
 // separationRouter 须在 songsRouter 之前注册，以接管
 // /songs/:id/separate、/songs/:id/instrumental、/songs/:id/vocals
 router.use('/', separationRouter);
+// transcodeRouter 接管 /songs/:id/transcode、/songs/:id/video 与 /transcode/*
+router.use('/', transcodeRouter);
 router.use('/songs', songsRouter);
 router.use('/scan', scanRouter);
 router.use('/', aiParseRouter);
@@ -45,5 +49,6 @@ router.use('/system', systemRouter);
 router.use('/', backupRouter);
 router.use('/dedup', dedupRouter);
 router.use('/download', downloadRouter);
+router.use('/lyrics', lyricsRouter);
 
 export default router;

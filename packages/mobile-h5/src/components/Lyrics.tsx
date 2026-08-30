@@ -4,9 +4,16 @@
 
 import { useRef, useEffect } from 'react';
 
+interface LyricWord {
+  text: string;
+  start: number; // 秒，绝对歌曲时间
+  end: number;   // 秒，绝对歌曲时间
+}
+
 interface LyricLine {
   time: number;
   text: string;
+  words?: LyricWord[]; // 逐字歌词（源 LRC 含 <mm:ss.xx> 时存在）
 }
 
 interface LyricsProps {
@@ -83,6 +90,25 @@ const css = `
 .lyric-line--past {
   color: var(--color-ink-3);
 }
+
+/* 逐字卡拉OK填充：左半 accent（已唱）、右半 ink-2（未唱）。
+   --p CSS 变量绑定渐变 stop（rAF 每帧直写）。
+   p=0 → 全 ink-2（未唱）；p=1 → 全 accent（已唱）；p=0.5 → 左半已唱右半未唱
+   background-size 100% 让渐变横跨整个 span。 */
+.lyric-word {
+  --p: 0%;
+  background-image: linear-gradient(
+    to right,
+    var(--color-accent) var(--p),
+    var(--color-ink-2) var(--p)
+  );
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .lyric-line {
     transition-duration: 0.01ms !important;
@@ -90,7 +116,7 @@ const css = `
 }
 `;
 
-export default function Lyrics({ lines, currentIndex }: LyricsProps) {
+export default function Lyrics({ lines, currentIndex, currentTime = 0, playing = false }: LyricsProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const safeLines = Array.isArray(lines) ? lines : [];
 
@@ -110,6 +136,55 @@ export default function Lyrics({ lines, currentIndex }: LyricsProps) {
       (containerRect.height - elRect.height) / 2;
     container.scrollTo({ top: targetTop, behavior: 'smooth' });
   }, [currentIndex]);
+
+  // 逐字填充：rAF 直写当前行词 span 的 --p CSS 变量，绕开 React 渲染
+  // （避免每帧重渲整列歌词）。currentTime 由父组件按 TV 广播节拍更新（1Hz），
+  // 锚点更新放函数体（每次渲染 currentTime 真正变化时刷新）而非 useEffect，
+  // 避免 deps 浅比较未变时锚点 ts 停在过去。
+  // 插值/冻结判定：playing 优先，暂停冻结；广播/卡顿超过 5s 兜底冻结防止漂移。
+  const propsRef = useRef({ currentIndex, currentTime });
+  propsRef.current = { currentIndex, currentTime };
+  const playingRef = useRef(playing ?? false);
+  playingRef.current = playing ?? false;
+  const anchorRef = useRef({ t: currentTime, ts: performance.now() });
+  const lastTimeRef = useRef(currentTime);
+
+  const newTime = currentTime;
+  if (newTime !== lastTimeRef.current) {
+    lastTimeRef.current = newTime;
+    anchorRef.current = { t: newTime, ts: performance.now() };
+  }
+
+  useEffect(() => {
+    let raf = 0;
+    const tick = () => {
+      raf = requestAnimationFrame(tick);
+      const { currentIndex: idx } = propsRef.current;
+      if (idx < 0) return;
+      const now = performance.now();
+      const elapsed = (now - anchorRef.current.ts) / 1000;
+      const t =
+        !playingRef.current || elapsed > 5
+          ? anchorRef.current.t
+          : anchorRef.current.t + elapsed;
+
+      const spans =
+        containerRef.current?.querySelectorAll(
+          `[data-lyric-index="${idx}"] .lyric-word`,
+        ) ?? [];
+      for (const el of spans) {
+        const ws = (el as HTMLElement).dataset.wstart;
+        const we = (el as HTMLElement).dataset.wend;
+        if (ws == null || we == null) continue;
+        const wsN = parseFloat(ws);
+        const weN = parseFloat(we);
+        const p = weN > wsN ? Math.max(0, Math.min(1, (t - wsN) / (weN - wsN))) : 0;
+        (el as HTMLElement).style.setProperty('--p', `${p * 100}%`);
+      }
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, []);
 
   if (safeLines.length === 0) {
     return (
@@ -131,6 +206,28 @@ export default function Lyrics({ lines, currentIndex }: LyricsProps) {
             {safeLines.map((line, i) => {
               const isCurrent = i === currentIndex;
               const isPast = i < currentIndex;
+              const showWords = isCurrent && !!line.words && line.words.length > 0;
+
+              if (showWords) {
+                return (
+                  <p
+                    key={i}
+                    data-lyric-index={i}
+                    className="lyric-line lyric-line--current"
+                  >
+                    {line.words!.map((w, wi) => (
+                      <span
+                        key={wi}
+                        className="lyric-word"
+                        data-wstart={w.start}
+                        data-wend={w.end}
+                      >
+                        {w.text}
+                      </span>
+                    ))}
+                  </p>
+                );
+              }
 
               return (
                 <p

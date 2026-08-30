@@ -166,6 +166,31 @@ router.get('/dashboard', authenticateToken, async (_req: Request, res: Response)
         .where(eq(schema.aiParseTasks.needReview, 1))
         .get()?.count ?? 0;
 
+    const transcodePending =
+      db
+        .select({ count: sql<number>`count(*)` })
+        .from(schema.transcodeTasks)
+        .where(eq(schema.transcodeTasks.status, 'pending'))
+        .get()?.count ?? 0;
+    const transcodeProcessing =
+      db
+        .select({ count: sql<number>`count(*)` })
+        .from(schema.transcodeTasks)
+        .where(eq(schema.transcodeTasks.status, 'processing'))
+        .get()?.count ?? 0;
+    const transcodeCompleted =
+      db
+        .select({ count: sql<number>`count(*)` })
+        .from(schema.transcodeTasks)
+        .where(eq(schema.transcodeTasks.status, 'completed'))
+        .get()?.count ?? 0;
+    const transcodeFailed =
+      db
+        .select({ count: sql<number>`count(*)` })
+        .from(schema.transcodeTasks)
+        .where(eq(schema.transcodeTasks.status, 'failed'))
+        .get()?.count ?? 0;
+
     const metadataComplete =
       db
         .select({ count: sql<number>`count(*)` })
@@ -232,6 +257,12 @@ router.get('/dashboard', authenticateToken, async (_req: Request, res: Response)
           completed: aiParseCompleted,
           failed: aiParseFailed,
           needReview: aiNeedReview,
+        },
+        transcode: {
+          pending: transcodePending,
+          processing: transcodeProcessing,
+          completed: transcodeCompleted,
+          failed: transcodeFailed,
         },
       },
     });
